@@ -1,10 +1,11 @@
 import { Canvas } from "@react-three/fiber";
-import { PlaceholderScene } from "./render/PlaceholderScene.tsx";
+import { CourtScene } from "./render/CourtScene.tsx";
 
 export default function App() {
   return (
-    <Canvas camera={{ position: [8, 6, 8], fov: 50 }}>
-      <PlaceholderScene />
+    <Canvas camera={{ position: [-3, 7, -20], fov: 50 }}>
+      <color attach="background" args={["#101418"]} />
+      <CourtScene />
     </Canvas>
   );
 }
