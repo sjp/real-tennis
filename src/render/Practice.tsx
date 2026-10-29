@@ -30,6 +30,7 @@ import { Court } from "./Court.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
 import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
 import { Player } from "./Player.tsx";
+import { settings, useSettings } from "./settings.ts";
 
 const world = createWorld(court);
 
@@ -62,7 +63,6 @@ interface Hud {
   /** The Marker's calls for the current rest. */
   readonly calls: readonly string[];
   readonly event: string | null;
-  readonly assist: boolean;
   readonly markings: boolean;
 }
 
@@ -157,7 +157,6 @@ export function Practice() {
     last: null,
     calls: [],
     event: null,
-    assist: true,
     markings: false,
   }));
   const onHud = (h: HudChange) =>
@@ -173,7 +172,7 @@ export function Practice() {
         KeyE: () => changeEnds(court, s),
         KeyQ: () => startServe(court, s),
       };
-      if (e.code === "KeyH") setHud((h) => ({ ...h, assist: !h.assist }));
+      if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
       if (e.code === "KeyX") explain.set(toggle(explain.get()));
       if (e.code === "KeyM") setHud((h) => ({ ...h, markings: !h.markings }));
       if (e.code === "Slash") showRules(!rulesOpen.current);
@@ -194,6 +193,7 @@ export function Practice() {
   }, [store, explain]);
 
   const s = store.get();
+  const { assist } = useSettings();
 
   return (
     <>
@@ -208,7 +208,7 @@ export function Practice() {
         <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
         {hud.markings && <Markings />}
-        <AssistRings view={() => store.get()} on={hud.assist} />
+        <AssistRings view={() => store.get()} on={assist} />
         <FollowCamera
           target={() => {
             const s = store.get();
@@ -236,7 +236,7 @@ export function Practice() {
           <div key={h}>{h}</div>
         ))}
         <div>
-          Hit assist: {hud.assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
+          Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
         </div>
       </div>
       {rules && <Rules onClose={() => showRules(false)} />}

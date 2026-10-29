@@ -22,6 +22,7 @@ import {
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { Player } from "./Player.tsx";
 import { Rules } from "./Rules.tsx";
+import { settings, useSettings } from "./settings.ts";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { cameraStart, describeNotice, HIGHLIGHT, panel } from "./view.ts";
@@ -145,7 +146,7 @@ function Loop({
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
-  "M: court markings · X: explanations on/off · ?: rules · Esc: lessons",
+  "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: lessons",
 ];
 
 function LessonGame({
@@ -203,6 +204,7 @@ function LessonGame({
         e.preventDefault();
         begin();
       }
+      if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
       if (e.code === "KeyM") setMarkings((m) => !m);
       if (e.code === "KeyX") explain.set(toggle(explain.get()));
       if (e.code === "Slash") showRules(!held.current.rules);
@@ -223,6 +225,7 @@ function LessonGame({
       ? EXPLANATIONS[ex.showing].feature
       : undefined;
   const isMatch = s.game.kind === "match";
+  const { assist } = useSettings();
   // Re-read on each HUD update, which follows every call.
   const m = s.game.kind === "match" ? s.game.play.match : null;
   const chases = m ? (m.playOff.length > 0 ? m.playOff : m.chases) : [];
@@ -257,7 +260,7 @@ function LessonGame({
             const a = learner(st);
             return { sim: simOf(st), motion: a.motion, end: a.end };
           }}
-          on
+          on={assist}
         />
         <FollowCamera
           target={() => {

@@ -10,6 +10,7 @@ import { PLAYER_ID } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
+import { settings, useSettings, type MatchSetup as Setup } from "./settings.ts";
 import { callScore, type Labels } from "../rules/score.ts";
 import type { ChaseCall } from "../court/chase.ts";
 import type { MatchState } from "../rules/match.ts";
@@ -35,12 +36,6 @@ const world = createWorld(court);
 const OPPONENT_ID = "opponent";
 const LABELS: Labels = { [PLAYER_ID]: "Player", [OPPONENT_ID]: "Opponent" };
 const OPPONENT_SHIRT = "#b5443c";
-
-interface Setup {
-  readonly level: AiLevel;
-  readonly sets: MatchConfig["sets"];
-  readonly suddenDeath: boolean;
-}
 
 interface Game {
   readonly play: PlayState;
@@ -70,7 +65,6 @@ interface Hud {
   /** The Marker's latest calls. */
   readonly calls: readonly string[];
   readonly event: string | null;
-  readonly assist: boolean;
   readonly markings: boolean;
   readonly over: boolean;
   /** Chases laid, or being played off. */
@@ -220,7 +214,6 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     last: null,
     calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),
     event: null,
-    assist: true,
     markings: false,
     over: false,
     ...chasesOf(start.state.match),
@@ -230,7 +223,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === "KeyH" && !e.repeat) setHud((h) => ({ ...h, assist: !h.assist }));
+      if (e.code === "KeyH" && !e.repeat) settings.set({ assist: !settings.get().assist });
       if (e.code === "KeyX" && !e.repeat) explain.set(toggle(explain.get()));
       if (e.code === "KeyM" && !e.repeat) setHud((h) => ({ ...h, markings: !h.markings }));
       if (e.code === "Slash" && !e.repeat) showRules(!rulesOpen.current);
@@ -244,6 +237,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   }, [onQuit, explain]);
 
   const me = human(game);
+  const { assist } = useSettings();
   return (
     <>
       <Canvas camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
@@ -271,7 +265,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
             motion: human(game).motion,
             end: human(game).end,
           })}
-          on={hud.assist}
+          on={assist}
         />
         <FollowCamera
           target={() => {
@@ -322,7 +316,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           <div key={h}>{h}</div>
         ))}
         <div>
-          Opponent: {setup.level} · Hit assist: {hud.assist ? "on" : "off"} · Explanations:{" "}
+          Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
           {ex.on ? "on" : "off"}
         </div>
       </div>
@@ -333,7 +327,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
 const LEVELS: readonly AiLevel[] = ["easy", "medium", "hard"];
 
 function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
-  const [setup, setSetup] = useState<Setup>({ level: "easy", sets: 1, suddenDeath: false });
+  const setup = useSettings().match;
+  const setSetup = (match: Setup) => settings.set({ match });
   const row = { display: "flex", gap: 8, alignItems: "center", margin: "8px 0" } as const;
   return (
     <div style={{ position: "fixed", inset: 0, background: "#101418" }}>
