@@ -6,6 +6,7 @@ import { Menu } from "./render/Menu.tsx";
 import { Practice } from "./render/Practice.tsx";
 import { Rules } from "./render/Rules.tsx";
 import { Sandbox } from "./render/Sandbox.tsx";
+import { Settings } from "./render/Settings.tsx";
 
 export default function App() {
   const params = new URLSearchParams(location.search);
@@ -13,6 +14,7 @@ export default function App() {
   if (params.has("match")) return <Match />;
   if (params.has("rules")) return <Rules />;
   if (params.has("learn")) return <Learn />;
+  if (params.has("settings")) return <Settings />;
   if (params.has("orbit"))
     return (
       <Canvas camera={{ position: [-3, 7, -20], fov: 50 }}>

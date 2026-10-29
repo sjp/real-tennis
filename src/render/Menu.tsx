@@ -1,6 +1,3 @@
-import { useState } from "react";
-import { reset } from "../teach/explain.ts";
-import { createExplainStore } from "./explainStore.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
 
 const ITEMS = [
@@ -8,11 +5,11 @@ const ITEMS = [
   { href: "?practice", title: "Practice", text: "On your own, with a ball machine" },
   { href: "?match", title: "Match", text: "Play against the computer" },
   { href: "?rules", title: "Rules", text: "The Laws, explained with the court" },
+  { href: "?settings", title: "Settings", text: "Hit assist, explanations and progress" },
 ] as const;
 
 /** The home menu. */
 export function Menu() {
-  const [cleared, setCleared] = useState(false);
   return (
     <div style={{ position: "fixed", inset: 0, background: "#101418" }}>
       <div
@@ -40,17 +37,6 @@ export function Menu() {
             <span style={{ color: "#888" }}> · {item.text}</span>
           </a>
         ))}
-        <button
-          style={{ marginTop: 12 }}
-          disabled={cleared}
-          onClick={() => {
-            const store = createExplainStore();
-            store.set(reset(store.get()));
-            setCleared(true);
-          }}
-        >
-          {cleared ? "Explanations will show again" : "Explain everything again"}
-        </button>
       </div>
     </div>
   );

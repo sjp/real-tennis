@@ -22,6 +22,7 @@ import {
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { Player } from "./Player.tsx";
 import { PauseMenu } from "./pause.tsx";
+import { loadDone, saveDone } from "./progress.ts";
 import { usePlayUi } from "./playUi.ts";
 import { useSettings } from "./settings.ts";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
@@ -30,25 +31,6 @@ import { cameraStart, describeNotice, HIGHLIGHT, panel } from "./view.ts";
 
 const world = createWorld(court);
 const OPPONENT_SHIRT = "#b5443c";
-const DONE = "realTennis.lessons";
-
-function loadDone(): readonly string[] {
-  try {
-    const ids: unknown = JSON.parse(localStorage.getItem(DONE) ?? "[]");
-    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveDone(ids: readonly string[]) {
-  try {
-    localStorage.setItem(DONE, JSON.stringify(ids));
-  } catch {
-    // Without storage, progress lasts until the page is closed.
-  }
-}
-
 interface Store {
   get(): LessonState;
   set(s: LessonState): void;
