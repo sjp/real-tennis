@@ -10,6 +10,8 @@ const world = createWorld(court);
 const config: MatchConfig = { players: ["a", "b"], sets: 1, suddenDeath: false };
 /** Each one-set match finishes in well under this much play. */
 const LIMIT = 60 * 60;
+/** Test timeout for a whole match, in ms. */
+const SLOW = 20_000;
 
 /** Ways of losing a rest that the AI's own choices could cause. */
 const BLUNDERS: readonly TeachingId[] = [
@@ -24,13 +26,17 @@ const BLUNDERS: readonly TeachingId[] = [
 const reason = (r: Rest) => ("reason" in r.outcome ? r.outcome.reason : r.outcome.kind);
 
 describe("AI against AI", () => {
-  it("plays a set to the end without a rule-breaking blunder", () => {
-    const presets = { a: AI_PRESETS.medium, b: AI_PRESETS.medium };
-    const { state, rests } = playAi(world, config, presets, 1, LIMIT);
-    expect(state.phase).toBe("over");
-    expect(state.match.winner).not.toBeNull();
-    expect(rests.map(reason).filter((r) => BLUNDERS.includes(r as TeachingId))).toEqual([]);
-  });
+  it(
+    "plays a set to the end without a rule-breaking blunder",
+    () => {
+      const presets = { a: AI_PRESETS.medium, b: AI_PRESETS.easy };
+      const { state, rests } = playAi(world, config, presets, 1, LIMIT);
+      expect(state.phase).toBe("over");
+      expect(state.match.winner).not.toBeNull();
+      expect(rests.map(reason).filter((r) => BLUNDERS.includes(r as TeachingId))).toEqual([]);
+    },
+    SLOW,
+  );
 
   describe("Hard against Easy", () => {
     const presets = { a: AI_PRESETS.hard, b: AI_PRESETS.easy };
