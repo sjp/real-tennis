@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { CourtScene } from "./render/CourtScene.tsx";
 import { Learn } from "./render/Learn.tsx";
 import { Match } from "./render/Match.tsx";
+import { Menu } from "./render/Menu.tsx";
 import { Practice } from "./render/Practice.tsx";
 import { Rules } from "./render/Rules.tsx";
 import { Sandbox } from "./render/Sandbox.tsx";
@@ -19,5 +20,6 @@ export default function App() {
         <CourtScene />
       </Canvas>
     );
-  return <Practice />;
+  if (params.has("practice")) return <Practice />;
+  return <Menu />;
 }

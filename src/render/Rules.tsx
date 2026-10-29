@@ -80,10 +80,14 @@ export function Rules({ onClose }: { onClose?: () => void }) {
     >
       <nav style={{ flex: "0 0 240px", padding: 16, borderRight: "1px solid #2a2f36" }}>
         <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>Rules of real tennis</div>
-        {onClose && (
+        {onClose ? (
           <button onClick={onClose} style={{ marginBottom: 8 }}>
             Back to the game (Esc)
           </button>
+        ) : (
+          <a href="?" style={{ color: HIGHLIGHT }}>
+            Back to the menu
+          </a>
         )}
         {TOPICS.map((t) => (
           <div key={t.id} style={{ marginTop: 10 }}>

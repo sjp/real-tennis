@@ -136,7 +136,7 @@ const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
-  "M: court markings · X: explanations on/off · ?: rules",
+  "M: court markings · X: explanations on/off · ?: rules · Esc: menu",
 ];
 
 /** Solo practice: move, hit, and serve, with no opponent. */
@@ -177,7 +177,10 @@ export function Practice() {
       if (e.code === "KeyX") explain.set(toggle(explain.get()));
       if (e.code === "KeyM") setHud((h) => ({ ...h, markings: !h.markings }));
       if (e.code === "Slash") showRules(!rulesOpen.current);
-      if (e.code === "Escape") showRules(false);
+      if (e.code === "Escape") {
+        if (!rulesOpen.current) location.assign(location.pathname);
+        showRules(false);
+      }
       if (rulesOpen.current) return;
       // No feeds while the Marker explains.
       if (explain.get().showing) return;

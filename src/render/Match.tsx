@@ -29,7 +29,7 @@ import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { Player } from "./Player.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
-import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
+import { cameraStart, describeEvent, describeNotice, HIGHLIGHT, panel } from "./view.ts";
 
 const world = createWorld(court);
 const OPPONENT_ID = "opponent";
@@ -376,6 +376,9 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
           </label>
         </div>
         <button onClick={() => onStart(setup)}>Toss for service and play</button>
+        <a href="?" style={{ color: HIGHLIGHT, marginLeft: 12 }}>
+          Menu
+        </a>
       </div>
     </div>
   );
