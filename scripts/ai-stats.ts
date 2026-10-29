@@ -1,0 +1,48 @@
+/**
+ * Plays AI against AI headless and prints the results, for tuning the
+ * presets (060). Usage: npm run ai:stats -- [a] [b] [sets]
+ * e.g. npm run ai:stats -- hard easy 10
+ */
+import { playAi } from "../src/ai/headless.ts";
+import { AI_PRESETS, type AiLevel } from "../src/ai/presets.ts";
+import { standardCourt } from "../src/court/standard.ts";
+import { createWorld } from "../src/sim/world.ts";
+
+const world = createWorld(standardCourt);
+const [a = "hard", b = "easy", count = "6"] = process.argv.slice(2);
+const levels = [a, b] as AiLevel[];
+if (!levels.every((l) => l in AI_PRESETS)) throw new Error(`Levels are ${Object.keys(AI_PRESETS)}`);
+
+const players = ["A", "B"] as const;
+const presets = { A: AI_PRESETS[levels[0]!], B: AI_PRESETS[levels[1]!] };
+const ways: Record<string, number> = {};
+const games = { A: 0, B: 0 };
+const sets = { A: 0, B: 0 };
+let rests = 0;
+let strokes = 0;
+const started = Date.now();
+for (let seed = 1; seed <= Number(count); seed++) {
+  const config = { players, sets: 1, suddenDeath: false } as const;
+  const { state, rests: played } = playAi(world, config, presets, seed);
+  for (const p of players) {
+    games[p] += state.match.setScores[0]?.[p] ?? 0;
+    sets[p] += state.match.sets[p] ?? 0;
+  }
+  for (const r of played) {
+    const o = r.outcome;
+    const way =
+      o.kind === "point"
+        ? `${o.winner} wins: ${o.reason}`
+        : `${o.kind}: ${"reason" in o ? o.reason : ""}`;
+    ways[way] = (ways[way] ?? 0) + 1;
+    rests++;
+    strokes += r.strokes;
+  }
+}
+
+console.log(`A (${a}) v B (${b}), ${count} one-set matches`);
+console.log(`Sets ${sets.A}–${sets.B}, games ${games.A}–${games.B}`);
+console.log(`${rests} rests, ${(strokes / rests).toFixed(1)} strokes a rest`);
+for (const [way, n] of Object.entries(ways).toSorted((x, y) => y[1] - x[1]))
+  console.log(`${String(n).padStart(5)}  ${way}`);
+console.log(`(${((Date.now() - started) / 1000).toFixed(1)} s)`);

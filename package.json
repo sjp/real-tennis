@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "oxlint --deny-warnings && oxfmt --check && tsc -b",
     "fmt": "oxfmt",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "ai:stats": "node scripts/ai-stats.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
