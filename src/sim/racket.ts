@@ -63,6 +63,7 @@ export function hit(
       asleep: false,
       bounces: 0,
       fallTime: null,
+      lastHitTime: state.time,
     },
     events: [
       {

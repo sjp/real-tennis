@@ -159,6 +159,8 @@ export interface SimState {
   readonly fallTime: number | null;
   readonly lastFloorTime: number;
   readonly lastWallTime: number;
+  /** When a racket last struck the ball. */
+  readonly lastHitTime: number;
 }
 
 export function initialState(ball: BallState, time = 0): SimState {
@@ -172,6 +174,7 @@ export function initialState(ball: BallState, time = 0): SimState {
     fallTime: null,
     lastFloorTime: -Infinity,
     lastWallTime: -Infinity,
+    lastHitTime: -Infinity,
   };
 }
 
