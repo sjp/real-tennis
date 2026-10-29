@@ -9,7 +9,7 @@ export function CourtScene() {
       <directionalLight position={[4, 12, -6]} intensity={1.8} />
       <directionalLight position={[-6, 8, 10]} intensity={0.6} />
       <Court court={standardCourt} />
-      {/* Debug camera, until the game camera arrives in 040. */}
+      {/* Free debug camera (`?orbit`). */}
       <OrbitControls target={[0, 1, 0]} />
     </>
   );
