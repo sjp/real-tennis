@@ -4,3 +4,19 @@ body,
   margin: 0;
   height: 100%;
 }
+
+body {
+  /* No pull-to-refresh or bounce while playing on a phone. */
+  overscroll-behavior: none;
+}
+
+canvas {
+  /* Touches on the court are play, not scrolling or zooming. */
+  touch-action: none;
+}
+
+button,
+select,
+input {
+  touch-action: manipulation;
+}

@@ -10,7 +10,7 @@ export interface Explanation {
   readonly title: string;
   /** Two to four sentences: what happened and why. */
   readonly text: string;
-  /** What to do about it, if there's anything to do. */
+  /** What to do about it, if there's anything to do. Control phrases are `{name}` (wording.ts). */
   readonly tip?: string;
   /** The part of the court to highlight. */
   readonly feature?: CourtFeature;
@@ -27,7 +27,7 @@ export const EXPLANATIONS: Readonly<Record<TeachingId, Explanation>> = {
   faultMissed: {
     title: "Fault: missed the ball",
     text: "If the server misses the ball, or doesn't strike it cleanly, the service is a fault.",
-    tip: "Toss with Space, then swing with Space as the ball drops past you.",
+    tip: "{toss}",
   },
   faultDoubleHit: {
     title: "Fault: hit twice",

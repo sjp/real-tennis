@@ -34,7 +34,7 @@ import { Court } from "./Court.tsx";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { hear } from "../audio/engine.ts";
 import { length } from "../sim/vec.ts";
-import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
+import { cameraStart, describeEvent, describeNotice, panel, hudPanel } from "./view.ts";
 import { Player } from "./Player.tsx";
 import { useSettings } from "./settings.ts";
 
@@ -228,7 +228,7 @@ export function Practice() {
           }}
         />
       </Canvas>
-      <div style={{ ...panel, left: 12, top: 12 }}>
+      <div style={hudPanel}>
         <div>{hud.choice}</div>
         {hud.last && <div>{hud.last}</div>}
         {hud.event && <div style={{ color: "#4cc9f0" }}>{hud.event}</div>}

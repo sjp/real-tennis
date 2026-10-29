@@ -5,6 +5,7 @@ import { featureShape } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { ENTRIES, TOPICS, type Entry } from "../teach/reference.ts";
 import { Court } from "./Court.tsx";
+import { useMedia } from "./media.ts";
 import { Highlight } from "./teach.tsx";
 import { HIGHLIGHT } from "./view.ts";
 
@@ -30,7 +31,7 @@ function CourtView({ entry }: { entry: Entry }) {
       ? [-12, 12, at.z - 9]
       : [at.x + n.x * 8, Math.max(1.6, at.y + 0.5), at.z + n.z * 8 - 2 * Math.abs(n.x)];
   return (
-    <div style={{ height: 320, borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
+    <div style={{ height: "min(320px, 60vh)", borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
       <Canvas key={entry.id} camera={{ position: from, fov: 50 }}>
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.7} />
@@ -65,6 +66,17 @@ function PointsDiagram() {
 export function Rules({ onClose }: { onClose?: () => void }) {
   const [id, setId] = useState(ENTRIES[0]!.id);
   const entry = ENTRIES.find((e) => e.id === id)!;
+  // On a narrow screen the list of entries is a dropdown above the entry.
+  const narrow = useMedia("(max-width: 640px)");
+  const back = onClose ? (
+    <button onClick={onClose} style={{ marginBottom: 8 }}>
+      Back to the game (Esc)
+    </button>
+  ) : (
+    <a href="?" style={{ color: HIGHLIGHT }}>
+      Back to the menu
+    </a>
+  );
   return (
     <div
       style={{
@@ -72,43 +84,64 @@ export function Rules({ onClose }: { onClose?: () => void }) {
         inset: 0,
         display: "flex",
         flexWrap: "wrap",
+        alignContent: "flex-start",
         overflow: "auto",
         background: "#101418",
         color: "#e8e8e8",
         font: "14px/1.6 ui-monospace, monospace",
       }}
     >
-      <nav style={{ flex: "0 0 240px", padding: 16, borderRight: "1px solid #2a2f36" }}>
-        <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>Rules of real tennis</div>
-        {onClose ? (
-          <button onClick={onClose} style={{ marginBottom: 8 }}>
-            Back to the game (Esc)
-          </button>
-        ) : (
-          <a href="?" style={{ color: HIGHLIGHT }}>
-            Back to the menu
-          </a>
-        )}
-        {TOPICS.map((t) => (
-          <div key={t.id} style={{ marginTop: 10 }}>
-            <div style={{ color: "#888", fontSize: 12, textTransform: "uppercase" }}>{t.name}</div>
-            {ENTRIES.filter((e) => e.topic === t.id).map((e) => (
-              <div key={e.id}>
-                <button
-                  onClick={() => setId(e.id)}
-                  style={{
-                    all: "unset",
-                    cursor: "pointer",
-                    color: e.id === id ? HIGHLIGHT : "#e8e8e8",
-                  }}
-                >
-                  {e.title}
-                </button>
-              </div>
-            ))}
+      {narrow ? (
+        <nav style={{ flex: "1 1 100%", padding: "16px 16px 0" }}>
+          <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>
+            Rules of real tennis
           </div>
-        ))}
-      </nav>
+          {back}
+          <select
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            style={{ display: "block", marginTop: 8, maxWidth: "100%" }}
+          >
+            {TOPICS.map((t) => (
+              <optgroup key={t.id} label={t.name}>
+                {ENTRIES.filter((e) => e.topic === t.id).map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.title}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </nav>
+      ) : (
+        <nav style={{ flex: "0 0 240px", padding: 16, borderRight: "1px solid #2a2f36" }}>
+          <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>
+            Rules of real tennis
+          </div>
+          {back}
+          {TOPICS.map((t) => (
+            <div key={t.id} style={{ marginTop: 10 }}>
+              <div style={{ color: "#888", fontSize: 12, textTransform: "uppercase" }}>
+                {t.name}
+              </div>
+              {ENTRIES.filter((e) => e.topic === t.id).map((e) => (
+                <div key={e.id}>
+                  <button
+                    onClick={() => setId(e.id)}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      color: e.id === id ? HIGHLIGHT : "#e8e8e8",
+                    }}
+                  >
+                    {e.title}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </nav>
+      )}
       <main style={{ flex: "1 1 360px", padding: 16, maxWidth: 760 }}>
         <h2 style={{ margin: "0 0 8px", color: "#ffffff" }}>{entry.title}</h2>
         {entry.paragraphs.map((p) => (

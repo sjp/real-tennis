@@ -36,7 +36,15 @@ import { Player } from "./Player.tsx";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { hear } from "../audio/engine.ts";
 import { length } from "../sim/vec.ts";
-import { cameraStart, describeEvent, describeNotice, HIGHLIGHT, panel } from "./view.ts";
+import {
+  cameraStart,
+  describeEvent,
+  describeNotice,
+  HIGHLIGHT,
+  panel,
+  hudPanel,
+  centred,
+} from "./view.ts";
 
 const world = createWorld(court);
 const OPPONENT_ID = "opponent";
@@ -277,7 +285,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           }}
         />
       </Canvas>
-      <div style={{ ...panel, left: 12, top: 12 }}>
+      <div style={hudPanel}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{hud.score}</div>
         {hud.chases.length > 0 && (
           <div style={{ color: "#f28482" }}>
@@ -303,7 +311,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
       )}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
       {hud.over && (
-        <div style={{ ...panel, left: "50%", top: "40%", transform: "translate(-50%, -50%)" }}>
+        <div style={centred}>
           <div style={{ fontSize: 18, marginBottom: 8 }}>{hud.score}</div>
           <button onClick={onQuit}>New match</button>
         </div>
@@ -333,10 +341,16 @@ const LEVELS: readonly AiLevel[] = ["easy", "medium", "hard"];
 function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
   const setup = useSettings().match;
   const setSetup = (match: Setup) => settings.set({ match });
-  const row = { display: "flex", gap: 8, alignItems: "center", margin: "8px 0" } as const;
+  const row = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    alignItems: "center",
+    margin: "8px 0",
+  } as const;
   return (
     <div style={{ position: "fixed", inset: 0, background: "#101418" }}>
-      <div style={{ ...panel, left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}>
+      <div style={centred}>
         <div style={{ fontSize: 18, marginBottom: 8 }}>Real tennis: a match</div>
         <div style={row}>
           Opponent:

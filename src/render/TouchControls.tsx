@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type PointerEvent, type ReactNode } from 
 import { SHOT_TYPES, type ShotType } from "../input/input.ts";
 import { STICK_RADIUS, type Stick, type Touch } from "../input/touch.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
+import { useMedia } from "./media.ts";
 import { HIGHLIGHT } from "./view.ts";
 
 const SHOT_NAMES: Record<ShotType, string> = {
@@ -67,6 +68,9 @@ function Press({
   );
 }
 
+/** The portrait hint, once dismissed, stays away until the page reloads. */
+let hintDismissed = false;
+
 export interface Extra {
   readonly label: string;
   readonly onPress: () => void;
@@ -98,8 +102,31 @@ export function TouchControls({
   };
   const serving = athlete.serve !== null;
   const style = SERVE_STYLES[athlete.serveStyle]!;
+  const portrait = useMedia("(orientation: portrait)");
+  const [hint, setHint] = useState(!hintDismissed);
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
+      {portrait && hint && (
+        <Press
+          style={{
+            ...pill,
+            position: "absolute",
+            left: "50%",
+            top: "40%",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "auto",
+            fontSize: 14,
+            padding: "12px 16px",
+            borderColor: HIGHLIGHT,
+          }}
+          onPress={() => {
+            hintDismissed = true;
+            setHint(false);
+          }}
+        >
+          Turn your phone sideways for a better view ✕
+        </Press>
+      )}
       <div
         style={{
           position: "absolute",

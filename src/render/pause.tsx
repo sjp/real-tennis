@@ -3,7 +3,7 @@ import { useExplainer, type ExplainStore } from "./explainStore.ts";
 import type { PlayUi } from "./playUi.ts";
 import { Rules } from "./Rules.tsx";
 import { settings, useSettings } from "./settings.ts";
-import { HIGHLIGHT, panel } from "./view.ts";
+import { centred, HIGHLIGHT } from "./view.ts";
 import { TouchSetting } from "./TouchSetting.tsx";
 import { Volume } from "./Volume.tsx";
 
@@ -44,18 +44,12 @@ export function PauseMenu({
       {ui.menu && (
         <div
           style={{
-            ...panel,
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -50%)",
+            ...centred,
             display: "flex",
             flexDirection: "column",
             gap: 6,
             padding: "16px 20px",
             border: `1px solid ${HIGHLIGHT}`,
-            maxHeight: "calc(100vh - 32px)",
-            overflow: "auto",
-            boxSizing: "border-box",
           }}
         >
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 4 }}>Paused</div>

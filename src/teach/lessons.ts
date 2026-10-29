@@ -38,6 +38,7 @@ export type LessonSetup =
 export interface Lesson {
   readonly id: string;
   readonly title: string;
+  /** Paragraphs, with control phrases as `{name}` (see wording.ts). */
   readonly intro: readonly string[];
   /** The objective, shown during the lesson. */
   readonly goal: string;
@@ -70,8 +71,8 @@ export const LESSONS: readonly Lesson[] = [
     id: "hitting",
     title: "Moving and hitting",
     intro: [
-      "A ball machine at the far end will feed you balls. Move with WASD or the arrow keys, and hold Shift to sprint.",
-      "Press Space to swing. Time it so the ball meets the racket beside you, as it drops after the bounce. The rings show where the ball will bounce and where you can reach it.",
+      "A ball machine at the far end will feed you balls. {move}",
+      "{swing} to swing. Time it so the ball meets the racket beside you, as it drops after the bounce. The rings show where the ball will bounce and where you can reach it.",
     ],
     goal: "Hit 3 balls back over the net",
     count: 3,
@@ -85,7 +86,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "Serving onto the penthouse",
     intro: [
       "Every rest starts with a service from the service end. The ball goes up onto the sloping roof on your left, the Side Penthouse, and runs along it to the far end.",
-      "A good service touches the Service Penthouse, past the net, then drops in the Service Court by the far wall. Press Space to toss the ball up, then Space again to strike. Keys 1–8 choose different serves.",
+      "A good service touches the Service Penthouse, past the net, then drops in the Service Court by the far wall. {swing} to toss the ball up, then {again} to strike. {serves}",
     ],
     goal: "Serve 3 good services",
     count: 3,
@@ -116,7 +117,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "Openings",
     intro: [
       "Three openings win the rest outright: the Dedans, the big net behind the service end; the Grille, in the far corner by the Main Wall; and the Winning Gallery, the last gallery under the penthouse at the hazard end.",
-      "From the hazard end the Dedans is the big target. Hold a direction as you strike to aim: forward to hit deeper, back to hit shorter, left or right to go sideways. A lob (3) carries all the way to the back wall.",
+      "From the hazard end the Dedans is the big target. {hold} a direction as you strike to aim: forward to hit deeper, back to hit shorter, left or right to go sideways. A {lob} carries all the way to the back wall.",
     ],
     goal: "Hit a ball into the Dedans, the Grille or the Winning Gallery",
     count: 1,
@@ -182,7 +183,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "Hazard chases",
     intro: [
       "At the hazard end, a ball that Falls on or beyond the Service Line wins the rest for the striker. One that Falls shorter, in the Hazard Court, lays a hazard chase instead.",
-      "From the service end, hit a ball that bounces twice in the Hazard Court, between the net and the Service Line. A soft lob (3), with back (S) held as you strike, drops short.",
+      "From the service end, hit a ball that bounces twice in the Hazard Court, between the net and the Service Line. A soft {lob}, {holdingBack} as you strike, drops short.",
     ],
     goal: "Lay a hazard chase",
     count: 1,
@@ -196,7 +197,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "The tambour",
     intro: [
       "The tambour is the angled buttress on the Main Wall at the hazard end. A ball that hits it shoots off across the court, which makes it hard to return.",
-      "From the service end, aim along the Main Wall, on your right, so the ball strikes the tambour. Hold right as you strike to aim that way.",
+      "From the service end, aim along the Main Wall, on your right, so the ball strikes the tambour. {hold} right as you strike to aim that way.",
     ],
     goal: "Hit the tambour",
     count: 1,
@@ -210,7 +211,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "A full game",
     intro: [
       "Put it all together: play a whole game against the Easy opponent, from the toss.",
-      "The Marker calls the score and the chases as you go. Press ? at any time for the rules.",
+      "The Marker calls the score and the chases as you go. {rules}",
     ],
     goal: "Play a game to the end",
     count: 1,

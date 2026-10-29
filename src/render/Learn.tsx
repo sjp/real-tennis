@@ -14,6 +14,7 @@ import { EXPLANATIONS } from "../teach/content.ts";
 import { dismiss, toggle } from "../teach/explain.ts";
 import { learner, lessonStep, startLesson, type LessonState } from "../teach/lesson.ts";
 import { LESSONS, OPPONENT_ID, type Lesson } from "../teach/lessons.ts";
+import { word } from "../teach/wording.ts";
 import { Court } from "./Court.tsx";
 import {
   createExplainStore,
@@ -33,7 +34,7 @@ import { hear } from "../audio/engine.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { length } from "../sim/vec.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
-import { cameraStart, describeNotice, HIGHLIGHT, panel } from "./view.ts";
+import { cameraStart, describeNotice, HIGHLIGHT, panel, hudPanel, centred } from "./view.ts";
 
 const world = createWorld(court);
 const OPPONENT_SHIRT = "#b5443c";
@@ -263,7 +264,7 @@ function LessonGame({
           }}
         />
       </Canvas>
-      <div style={{ ...panel, left: 12, top: 12, maxWidth: 520 }}>
+      <div style={hudPanel}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
         <div style={{ color: HIGHLIGHT }}>
           {lesson.goal}: {Math.min(hud.progress, lesson.count)} / {lesson.count}
@@ -300,7 +301,7 @@ function LessonGame({
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>{lesson.title}</div>
           {lesson.intro.map((p) => (
             <p key={p} style={{ margin: "0 0 8px" }}>
-              {p}
+              {word(p, touchShown ? "touch" : "keys")}
             </p>
           ))}
           <div style={{ color: HIGHLIGHT, margin: "8px 0" }}>Goal: {lesson.goal}</div>
@@ -310,7 +311,7 @@ function LessonGame({
               setIntro(false);
             }}
           >
-            Start (Space)
+            {touchShown ? "Start" : "Start (Space)"}
           </button>
         </Centred>
       )}
@@ -340,11 +341,7 @@ function Centred({ children }: { children: ReactNode }) {
   return (
     <div
       style={{
-        ...panel,
-        left: "50%",
-        top: "45%",
-        transform: "translate(-50%, -50%)",
-        maxWidth: 520,
+        ...centred,
         padding: "16px 20px",
         border: `1px solid ${HIGHLIGHT}`,
       }}
@@ -401,10 +398,19 @@ export function Learn() {
         {LESSONS.map((l, i) => (
           <div
             key={l.id}
-            style={{ display: "flex", gap: 12, alignItems: "center", margin: "6px 0" }}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0 12px",
+              alignItems: "center",
+              margin: "6px 0",
+            }}
           >
             <span style={{ width: 16, color: HIGHLIGHT }}>{done.includes(l.id) ? "✓" : ""}</span>
-            <button onClick={() => open(i)} style={{ minWidth: 260, textAlign: "left" }}>
+            <button
+              onClick={() => open(i)}
+              style={{ minWidth: "min(260px, 70vw)", textAlign: "left" }}
+            >
               {i + 1}. {l.title}
             </button>
             <span style={{ color: "#888", fontSize: 12 }}>{l.goal}</span>

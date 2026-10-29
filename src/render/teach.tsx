@@ -5,6 +5,8 @@ import { featureName, featureShape, type CourtFeature } from "../court/features.
 import { standardCourt as court } from "../court/standard.ts";
 import { TEACHING, type TeachingId } from "../rules/teaching.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
+import { word } from "../teach/wording.ts";
+import { useTouchShown } from "./inputMode.ts";
 import { polygonGeometry } from "./geometry.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
 
@@ -107,6 +109,7 @@ export function ExplainPanel({
   onOff: () => void;
 }) {
   const e = EXPLANATIONS[id];
+  const touch = useTouchShown();
   useEffect(() => {
     const down = (k: KeyboardEvent) => {
       if (k.code === "Space" || k.code === "Enter") {
@@ -123,7 +126,10 @@ export function ExplainPanel({
         ...panel,
         right: 12,
         top: 12,
-        maxWidth: 380,
+        maxWidth: "min(380px, calc(100vw - 24px))",
+        maxHeight: "calc(100vh - 24px)",
+        overflow: "auto",
+        boxSizing: "border-box",
         padding: "12px 16px",
         border: `1px solid ${HIGHLIGHT}`,
       }}
@@ -133,11 +139,15 @@ export function ExplainPanel({
         {e.title}
       </div>
       <div>{e.text}</div>
-      {e.tip && <div style={{ color: "#ffd166", marginTop: 6 }}>{e.tip}</div>}
+      {e.tip && (
+        <div style={{ color: "#ffd166", marginTop: 6 }}>
+          {word(e.tip, touch ? "touch" : "keys")}
+        </div>
+      )}
       <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Law {TEACHING[id].law}</div>
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <button onClick={onClose}>Continue (Space)</button>
-        <button onClick={onOff}>Stop explaining (X)</button>
+        <button onClick={onClose}>{touch ? "Continue" : "Continue (Space)"}</button>
+        <button onClick={onOff}>{touch ? "Stop explaining" : "Stop explaining (X)"}</button>
       </div>
     </div>
   );

@@ -28,6 +28,23 @@ export const panel = {
   borderRadius: 6,
 } as const;
 
+/** The HUD in the top left: half the screen at most, leaving room for the touch buttons. */
+export const hudPanel = { ...panel, left: 12, top: 12, maxWidth: "min(520px, 48vw)" } as const;
+
+/** A panel in the middle of the screen that fits a phone. */
+export const centred = {
+  ...panel,
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  // Not shrunk to the half of the screen right of `left`.
+  width: "max-content",
+  maxWidth: "min(520px, calc(100vw - 32px))",
+  maxHeight: "calc(100vh - 32px)",
+  overflow: "auto",
+  boxSizing: "border-box",
+} as const;
+
 /** The player's last stroke, and whether it clears the last event. */
 export function describeNotice(n: Notice): { last?: string; event?: null } {
   switch (n.type) {
