@@ -41,11 +41,49 @@ function armAngle(t: number): number {
   return Math.min(90, ((t - SWING_TIME) / FOLLOW_THROUGH) * 90);
 }
 
+const SKIN = "#e0b48c";
+const SHIRT = "#3a6ea5";
+const TROUSERS = "#e8e2d0";
+const SHOES = "#2b2b2b";
+const HAIR = "#4a3222";
+
+const HIP = 0.92;
+const LEG = HIP - 0.06;
+const SHOULDER_WIDTH = 0.21;
+/** Stride angle at full running speed, and steps per metre. */
+const STRIDE = 35 * DEG;
+const STEPS_PER_METRE = 1.4;
+/** How far the free arm is held out from the side. */
+const FREE_ARM_OUT = 30 * DEG;
+
+/** A limb hanging down from its pivot: a tapered cylinder of `length`. */
+function Limb({
+  length,
+  top,
+  bottom,
+  color,
+}: {
+  length: number;
+  top: number;
+  bottom: number;
+  color: string;
+}) {
+  return (
+    <mesh position={[0, -length / 2, 0]}>
+      <cylinderGeometry args={[top, bottom, length, 8]} />
+      <meshStandardMaterial color={color} flatShading />
+    </mesh>
+  );
+}
+
 export function Player({ store }: { store: Store }) {
   const body = useRef<Group>(null);
   const arm = useRef<Group>(null);
+  const free = useRef<Group>(null);
+  const legs = useRef<(Group | null)[]>([]);
+  const stride = useRef({ phase: 0, last: 0 });
   const head = useMemo(() => headGeometry(), []);
-  const { height, radius } = standardPlayer;
+  const { height, runSpeed } = standardPlayer;
   const shoulder = height - 0.35;
 
   useFrame(() => {
@@ -61,26 +99,83 @@ export function Player({ store }: { store: Store }) {
     }
     // Facing +z the right is -x. The arm points along its local +x; turn it
     // so 0° is straight out to the side and positive angles come forwards.
-    arm.current.position.x = backhand ? radius : -radius;
+    arm.current.position.x = backhand ? SHOULDER_WIDTH : -SHOULDER_WIDTH;
     arm.current.rotation.y = backhand ? -angle * DEG : Math.PI + angle * DEG;
+
+    // Legs and the free arm swing with the distance run.
+    const st = stride.current;
+    const dt = Math.max(0, Math.min(0.1, s.sim.time - st.last));
+    st.last = s.sim.time;
+    const speed = Math.hypot(s.motion.velocity.x, s.motion.velocity.z);
+    st.phase += speed * dt * STEPS_PER_METRE * Math.PI;
+    const swing = Math.sin(st.phase) * STRIDE * Math.min(1, speed / runSpeed);
+    legs.current.forEach((leg, i) => leg?.rotation.set(i === 0 ? swing : -swing, 0, 0));
+    if (free.current) {
+      // Held a little out from the side, for balance.
+      const out = backhand ? -1 : 1;
+      free.current.position.x = out * (SHOULDER_WIDTH + 0.02);
+      free.current.rotation.set(swing, 0, out * FREE_ARM_OUT);
+    }
   });
 
   return (
     <group ref={body}>
-      <mesh position={[0, (shoulder + 0.1) / 2, 0]}>
-        <capsuleGeometry args={[radius * 0.8, shoulder - 0.3, 4, 12]} />
-        <meshStandardMaterial color="#3a6ea5" flatShading />
+      {/* Legs, from the hips, with shoes. */}
+      {[-0.1, 0.1].map((x, i) => (
+        <group
+          key={x}
+          ref={(g) => {
+            legs.current[i] = g;
+          }}
+          position={[x, HIP, 0]}
+        >
+          <Limb length={LEG} top={0.075} bottom={0.055} color={TROUSERS} />
+          <mesh position={[0, -LEG + 0.01, 0.05]}>
+            <boxGeometry args={[0.1, 0.08, 0.26]} />
+            <meshStandardMaterial color={SHOES} />
+          </mesh>
+        </group>
+      ))}
+      {/* Hips and torso. */}
+      <mesh position={[0, HIP, 0]}>
+        <cylinderGeometry args={[0.18, 0.17, 0.16, 10]} />
+        <meshStandardMaterial color={TROUSERS} flatShading />
       </mesh>
-      <mesh position={[0, height - 0.12, 0]}>
-        <icosahedronGeometry args={[0.12, 1]} />
-        <meshStandardMaterial color="#e0b48c" flatShading />
+      <mesh position={[0, (HIP + shoulder) / 2 + 0.02, 0]} scale={[1, 1, 0.7]}>
+        <cylinderGeometry args={[0.22, 0.17, shoulder - HIP + 0.1, 10]} />
+        <meshStandardMaterial color={SHIRT} flatShading />
       </mesh>
-      {/* Shoulder pivot; the arm points along +x before rotating. */}
-      <group ref={arm} position={[-radius, shoulder - 0.05, 0]}>
+      {/* Neck and head, with hair. */}
+      <mesh position={[0, shoulder + 0.07, 0]}>
+        <cylinderGeometry args={[0.05, 0.055, 0.12, 8]} />
+        <meshStandardMaterial color={SKIN} flatShading />
+      </mesh>
+      <mesh position={[0, height - 0.13, 0]} scale={[0.9, 1.05, 1]}>
+        <icosahedronGeometry args={[0.11, 1]} />
+        <meshStandardMaterial color={SKIN} flatShading />
+      </mesh>
+      {/* Hair over the top and back of the head; the face is towards +z. */}
+      <mesh position={[0, height - 0.12, -0.012]} rotation={[-0.6, 0, 0]} scale={[0.95, 1, 1]}>
+        <sphereGeometry args={[0.112, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
+        <meshStandardMaterial color={HAIR} flatShading />
+      </mesh>
+      {/* The free arm, hanging from the other shoulder. */}
+      <group ref={free} position={[SHOULDER_WIDTH, shoulder - 0.05, 0]}>
+        <Limb length={0.32} top={0.05} bottom={0.042} color={SHIRT} />
+        <group position={[0, -0.3, 0]} rotation={[-0.5, 0, 0]}>
+          <Limb length={0.28} top={0.04} bottom={0.033} color={SKIN} />
+        </group>
+      </group>
+      {/* Racket arm: the shoulder pivot; the arm points along +x before rotating. */}
+      <group ref={arm} position={[-SHOULDER_WIDTH, shoulder - 0.03, 0]}>
         <group rotation={[0, 0, -40 * DEG]}>
-          <mesh position={[0.25, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.04, 0.035, 0.5, 6]} />
-            <meshStandardMaterial color="#e0b48c" flatShading />
+          <mesh position={[0.13, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.042, 0.05, 0.26, 8]} />
+            <meshStandardMaterial color={SHIRT} flatShading />
+          </mesh>
+          <mesh position={[0.38, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.032, 0.04, 0.24, 8]} />
+            <meshStandardMaterial color={SKIN} flatShading />
           </mesh>
           {/* The racket, from the hand outwards. */}
           <group position={[0.5, 0, 0]} rotation={[0, 0, 30 * DEG]}>
