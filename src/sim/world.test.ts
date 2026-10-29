@@ -85,6 +85,17 @@ describe("net", () => {
   });
 });
 
+describe("net crossing", () => {
+  it("reports the ball crossing the net, each way", () => {
+    const { events } = predict(world, launch(vec(0, 2, -3), vec(0, 3, 12)), 3);
+    const crossings = events.filter((e) => e.type === "netCrossed");
+    expect(crossings[0]).toMatchObject({ from: "service" });
+    expect(crossings[0]!.position.z).toBeGreaterThanOrEqual(0);
+    const { events: back } = predict(weightless, launch(vec(1, 2, 3), vec(0, 0, -10)), 0.5);
+    expect(back[0]).toMatchObject({ type: "netCrossed", from: "hazard" });
+  });
+});
+
 describe("openings", () => {
   const into = (id: string) => {
     const o = court.openings.find((o) => o.id === id)!;
@@ -124,7 +135,7 @@ describe("walls", () => {
   });
 
   it("ends the ball's life above the Out of Court Line", () => {
-    const { events, state } = predict(world, launch(vec(0, 2, 0), vec(0, 14, -12)), 3);
+    const { events, state } = predict(world, launch(vec(0, 2, -0.5), vec(0, 14, -12)), 3);
     expect(events[0]).toMatchObject({ type: "outOfCourt" });
     expect(events).toHaveLength(1);
     expect(state.live).toBe(false);

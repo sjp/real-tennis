@@ -44,7 +44,7 @@ function serve(style: ServeStyle, error = 0): readonly SimEvent[] {
  * drops in the Service Court or enters the Winning Gallery.
  */
 function goodService(events: readonly SimEvent[]): boolean {
-  const rest = events.filter((e) => e.type !== "racketHit");
+  const rest = events.filter((e) => e.type !== "racketHit" && e.type !== "netCrossed");
   const reached = rest.findIndex((e) => e.surface === "penthouse:service");
   if (reached < 0) return false;
   const before = rest.slice(0, reached);
@@ -74,7 +74,7 @@ describe("serve styles", () => {
   });
 
   it("strikes the Service Wall first with the Side Wall serve", () => {
-    expect(surfaces("sideWall")[1]).toBe("serviceWall");
+    expect(surfaces("sideWall").filter((s) => s !== "net")[1]).toBe("serviceWall");
   });
 
   it("has eight distinct styles", () => {

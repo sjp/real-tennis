@@ -49,6 +49,7 @@ const EVENT_COLOUR: Record<SimEvent["type"], string> = {
   tambourHit: "#b388eb",
   netHit: "#ff8fa3",
   nick: "#ff5d5d",
+  netCrossed: "#6c757d",
   enteredOpening: "#06d6a0",
   outOfCourt: "#ff5d5d",
   playerHit: "#ff9f1c",

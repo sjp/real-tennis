@@ -24,6 +24,8 @@ export type SimEvent = EventBase &
     | { readonly type: "netHit"; readonly face: Side; readonly cord: boolean }
     /** The ball met the floor and a wall at once. */
     | { readonly type: "nick" }
+    /** The ball's centre crossed the plane of the net, from `from`. */
+    | { readonly type: "netCrossed"; readonly from: Side }
     | { readonly type: "enteredOpening"; readonly opening: OpeningId }
     | { readonly type: "outOfCourt" }
     | { readonly type: "playerHit"; readonly player: string }

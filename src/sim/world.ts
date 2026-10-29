@@ -306,18 +306,31 @@ export function step(
   const emit = (e: SimEvent) => {
     if (s.live) events.push(e);
   };
+  const crossing = (a: Vec3, b: Vec3) => {
+    if (a.z < 0 !== b.z < 0)
+      emit({
+        time: s.time,
+        position: b,
+        type: "netCrossed",
+        from: a.z < 0 ? "service" : "hazard",
+        surface: "net",
+      });
+  };
 
   for (let i = 0; i < 8 && remaining > 0; i++) {
     const next = flight(p, ball, remaining);
     const hit = firstHit(world, ball.position, next.position, skip, players);
     if (hit === null) {
-      ball = next;
       s.time += remaining;
+      crossing(ball.position, next.position);
+      ball = next;
       break;
     }
     const t = hit.s * remaining;
+    const from = ball.position;
     ball = flight(p, ball, t);
     s.time += t;
+    crossing(from, ball.position);
     remaining -= t;
     skip.add(hit.body);
     const at = { time: s.time, position: ball.position };

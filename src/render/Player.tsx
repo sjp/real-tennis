@@ -88,11 +88,7 @@ export function Player({ store }: { store: Store }) {
               <cylinderGeometry args={[0.014, 0.016, HANDLE_LENGTH, 6]} />
               <meshStandardMaterial color="#7a5230" />
             </mesh>
-            <mesh
-              geometry={head}
-              position={[HANDLE_LENGTH, 0, 0]}
-              rotation={[0, 0, -Math.PI / 2]}
-            >
+            <mesh geometry={head} position={[HANDLE_LENGTH, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
               <meshStandardMaterial color="#d9c9a3" flatShading />
             </mesh>
           </group>
