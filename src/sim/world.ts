@@ -178,6 +178,8 @@ export function initialState(ball: BallState, time = 0): SimState {
   };
 }
 
+/** How far below the floor a ball must be to have escaped the court. */
+const ESCAPED = 1;
 /** Below this approach speed a contact is resting: no bounce and no event. */
 const RESTING_CONTACT = 0.2;
 /** `restOnFloor` fires when the ball rolls slower than this… */
@@ -392,6 +394,14 @@ export function step(
       if (s.time - s.lastFloorTime <= NICK_WINDOW) emit({ ...at, type: "nick", surface });
       s.lastWallTime = s.time;
     }
+  }
+
+  // A safety net: a ball that has somehow escaped the court is out of it.
+  if (ball.position.y < -ESCAPED) {
+    emit({ time: s.time, position: ball.position, type: "outOfCourt", surface: "outOfCourt" });
+    s.live = false;
+    s.asleep = true;
+    ball = { ...ball, velocity: ZERO, spin: ZERO };
   }
 
   if (rolling) {

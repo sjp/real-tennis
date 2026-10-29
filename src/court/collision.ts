@@ -209,6 +209,24 @@ export function collisionGeometry(court: CourtDefinition): CollisionPrimitive[] 
           along,
         );
       }
+      // The recess's sill and top, so a ball can't fall or rise out of it.
+      if (o.depth > 0) {
+        for (const [y, up] of [
+          [r.y0, 1],
+          [r.y1, -1],
+        ] as const) {
+          poly(
+            `joue:${o.id}`,
+            [
+              frame.at(r.u0, y),
+              frame.at(r.u1, y),
+              frame.at(r.u1, y, o.depth),
+              frame.at(r.u0, y, o.depth),
+            ],
+            v(0, up, 0),
+          );
+        }
+      }
       out.push({
         kind: "opening",
         opening: o.id,

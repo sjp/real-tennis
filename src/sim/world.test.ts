@@ -117,6 +117,26 @@ describe("openings", () => {
     expect(state.captured).toBe(id);
     expect(state.live).toBe(false);
   });
+
+  it("keeps a ball dropping into a gallery's recess off the floor below", () => {
+    const o = court.openings.find((o) => o.id === "winningGallery")!;
+    const u = (o.rect.u0 + o.rect.u1) / 2;
+    const { events, state } = predict(
+      world,
+      launch(vec(hw - 0.3, o.rect.y0 + 0.2, u), vec(2, 0, 0)),
+      3,
+    );
+    expect(types(events)).not.toContain("outOfCourt");
+    expect(state.ball.position.y).toBeGreaterThan(o.rect.y0);
+  });
+});
+
+describe("escape", () => {
+  it("puts a ball that has escaped below the floor out of court", () => {
+    const { events, state } = predict(world, launch(vec(0, -2, 0), vec(0, -1, 0)), 0.1);
+    expect(types(events)).toEqual(["outOfCourt"]);
+    expect(state).toMatchObject({ live: false, asleep: true });
+  });
 });
 
 describe("walls", () => {
