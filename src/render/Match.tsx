@@ -44,7 +44,10 @@ import {
   panel,
   hudPanel,
   centred,
+  DPR,
+  FPS,
 } from "./view.ts";
+import { FpsMeter, FpsProbe } from "./Fps.tsx";
 
 const world = createWorld(court);
 const OPPONENT_ID = "opponent";
@@ -237,13 +240,14 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const { assist } = useSettings();
   return (
     <>
-      <Canvas camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
+      <Canvas dpr={DPR} camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
         <Ears />
+        {FPS && <FpsProbe />}
         <ServeLine visible={() => human(game).serve !== null} />
         <Player view={() => ({ athlete: human(game), time: game.get().play.sim.time })} />
         <Player
@@ -285,6 +289,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           }}
         />
       </Canvas>
+      {FPS && <FpsMeter />}
       <div style={hudPanel}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{hud.score}</div>
         {hud.chases.length > 0 && (

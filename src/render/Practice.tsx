@@ -34,7 +34,8 @@ import { Court } from "./Court.tsx";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { hear } from "../audio/engine.ts";
 import { length } from "../sim/vec.ts";
-import { cameraStart, describeEvent, describeNotice, panel, hudPanel } from "./view.ts";
+import { cameraStart, describeEvent, describeNotice, panel, hudPanel, DPR, FPS } from "./view.ts";
+import { FpsMeter, FpsProbe } from "./Fps.tsx";
 import { Player } from "./Player.tsx";
 import { useSettings } from "./settings.ts";
 
@@ -203,13 +204,14 @@ export function Practice() {
 
   return (
     <>
-      <Canvas camera={{ position: cameraStart(s.motion.position, s.end), fov: 55 }}>
+      <Canvas dpr={DPR} camera={{ position: cameraStart(s.motion.position, s.end), fov: 55 }}>
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
         <Ears />
+        {FPS && <FpsProbe />}
         <ServeLine visible={() => store.get().serve !== null} />
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
         <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />
@@ -228,6 +230,7 @@ export function Practice() {
           }}
         />
       </Canvas>
+      {FPS && <FpsMeter />}
       <div style={hudPanel}>
         <div>{hud.choice}</div>
         {hud.last && <div>{hud.last}</div>}

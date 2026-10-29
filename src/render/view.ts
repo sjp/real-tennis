@@ -14,6 +14,19 @@ export function cameraStart(at: FloorPoint, end: Side): [number, number, number]
   return [at.x, ABOVE, at.z - f * BEHIND];
 }
 
+/**
+ * The canvas's device pixel ratio: capped, as phones' 3× screens cost far more
+ * than they show. ⚠ verify on a phone.
+ */
+export const DPR: [number, number] = [
+  1,
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? 1.5 : 2,
+];
+
+/** Show the frame-rate meter: `?fps`. */
+export const FPS =
+  typeof location !== "undefined" && new URLSearchParams(location.search).has("fps");
+
 /** Teaching highlights. */
 export const HIGHLIGHT = "#4cc9f0";
 

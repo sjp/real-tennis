@@ -34,7 +34,17 @@ import { hear } from "../audio/engine.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { length } from "../sim/vec.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
-import { cameraStart, describeNotice, HIGHLIGHT, panel, hudPanel, centred } from "./view.ts";
+import {
+  cameraStart,
+  describeNotice,
+  HIGHLIGHT,
+  panel,
+  hudPanel,
+  centred,
+  DPR,
+  FPS,
+} from "./view.ts";
+import { FpsMeter, FpsProbe } from "./Fps.tsx";
 
 const world = createWorld(court);
 const OPPONENT_SHIRT = "#b5443c";
@@ -215,13 +225,14 @@ function LessonGame({
   const chases = m ? (m.playOff.length > 0 ? m.playOff : m.chases) : [];
   return (
     <>
-      <Canvas camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
+      <Canvas dpr={DPR} camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
         <Ears />
+        {FPS && <FpsProbe />}
         <ServeLine visible={() => learner(store.get()).serve !== null} />
         <Player view={() => ({ athlete: learner(store.get()), time: simOf(store.get()).time })} />
         {isMatch && (
@@ -264,6 +275,7 @@ function LessonGame({
           }}
         />
       </Canvas>
+      {FPS && <FpsMeter />}
       <div style={hudPanel}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
         <div style={{ color: HIGHLIGHT }}>

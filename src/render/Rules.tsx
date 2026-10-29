@@ -7,7 +7,7 @@ import { ENTRIES, TOPICS, type Entry } from "../teach/reference.ts";
 import { Court } from "./Court.tsx";
 import { useMedia } from "./media.ts";
 import { Highlight } from "./teach.tsx";
-import { HIGHLIGHT } from "./view.ts";
+import { DPR, HIGHLIGHT } from "./view.ts";
 
 const POINTS: readonly [string, string][] = [
   ["No points", "Love"],
@@ -32,7 +32,7 @@ function CourtView({ entry }: { entry: Entry }) {
       : [at.x + n.x * 8, Math.max(1.6, at.y + 0.5), at.z + n.z * 8 - 2 * Math.abs(n.x)];
   return (
     <div style={{ height: "min(320px, 60vh)", borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
-      <Canvas key={entry.id} camera={{ position: from, fov: 50 }}>
+      <Canvas key={entry.id} dpr={DPR} camera={{ position: from, fov: 50 }}>
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[4, 12, -6]} intensity={1.6} />
