@@ -42,6 +42,8 @@ export interface RallyState {
   readonly penthouse: boolean;
   /** The service has touched the Side Penthouse or the Service Wall. */
   readonly touched: boolean;
+  /** The service has come back off the Grille end, and the Marker has said so. */
+  readonly boomerang: boolean;
   /** The current stroke has passed the net. */
   readonly crossed: boolean;
   /** …and come back over it to the striker's side. */
@@ -68,6 +70,7 @@ export function startRally(setup: RallySetup, striker: PlayerId | null = null): 
     service: striker === null,
     penthouse: false,
     touched: false,
+    boomerang: false,
     crossed: false,
     cameBack: false,
     drop: null,
@@ -210,13 +213,11 @@ class Rally {
   serviceAfter(e: SimEvent): RallyStep {
     switch (e.type) {
       case "penthouseHit":
-        if (e.surface.endsWith(":grille")) this.teaching.push(teach("boomerang"));
-        return this.next({});
+        return e.surface.endsWith(":grille") ? this.boomerang() : this.next({});
       case "wallHit":
         if (e.surface === "mainWall") return this.fault("faultMainWall");
         if (e.surface.startsWith("post:")) return this.serviceOpening(postOf(e.surface));
-        if (e.surface === "highBackWall:grille") this.teaching.push(teach("boomerang"));
-        return this.next({});
+        return e.surface === "highBackWall:grille" ? this.boomerang() : this.next({});
       case "tambourHit":
         return this.fault("faultMainWall");
       case "outOfCourt":
@@ -231,6 +232,12 @@ class Rally {
       default:
         return this.fault("faultDrop");
     }
+  }
+
+  /** Said once, however many times the ball touches the Grille end. */
+  boomerang(): RallyStep {
+    if (!this.s.boomerang) this.teaching.push(teach("boomerang"));
+    return this.next({ boomerang: true });
   }
 
   serviceOpening(id: OpeningId): RallyStep {

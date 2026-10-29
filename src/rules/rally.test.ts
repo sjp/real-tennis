@@ -123,7 +123,7 @@ describe("service (Law 8.1(d))", () => {
       serviceCourt,
     ]);
     expect(o).toBeNull();
-    expect(teaching).toContain("boomerang");
+    expect(teaching.filter((t) => t === "boomerang")).toHaveLength(1);
   });
 
   it.each([
