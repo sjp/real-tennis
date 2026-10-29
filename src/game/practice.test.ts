@@ -9,13 +9,12 @@ import {
   changeEnds,
   feedDrop,
   feedMachine,
-  idealContact,
   initialPractice,
   practiceStep,
   startServe,
-  type Notice,
   type PracticeState,
 } from "./practice.ts";
+import { idealContact, type Notice } from "./player.ts";
 
 const world = createWorld(court);
 const hl = court.floor.length / 2;

@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { ExtrudeGeometry, Shape, Vector3, type Group } from "three";
-import { timeSwing, FOLLOW_THROUGH } from "../game/practice.ts";
+import { timeSwing, FOLLOW_THROUGH } from "../game/player.ts";
 import { standardPlayer } from "../player/movement.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";

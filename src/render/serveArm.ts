@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector3 } from "three";
-import { FOLLOW_THROUGH } from "../game/practice.ts";
+import { FOLLOW_THROUGH } from "../game/player.ts";
 import { handPosition } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";
 

@@ -10,9 +10,9 @@ import {
   initialPractice,
   practiceStep,
   startServe,
-  type Notice,
   type PracticeState,
 } from "../game/practice.ts";
+import type { Notice } from "../game/player.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { forwardZ } from "../player/movement.ts";
 import { secondGalleryLineZ, SERVE_STYLES } from "../player/serve.ts";
