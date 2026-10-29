@@ -116,7 +116,16 @@ describe("practice", () => {
     const p = s.motion.position;
     expect(Math.abs(bounce.position.x - p.x)).toBeLessThan(2);
     expect(bounce.position.z).toBeGreaterThan(p.z);
-    expect(bounce.position.z).toBeLessThan(p.z + 6);
+    expect(bounce.position.z).toBeLessThan(p.z + 4);
+  });
+
+  it("feeds over the net every time", () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const { events } = run(feedMachine(world, fed, random), 3);
+      expect(events.some((e) => e.type === "netHit")).toBe(false);
+      expect(events.find((e) => e.type === "floorBounce")!.position.z).toBeLessThan(0);
+    }
   });
 
   it("changes ends", () => {

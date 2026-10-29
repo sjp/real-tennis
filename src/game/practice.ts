@@ -260,6 +260,9 @@ export function feedDrop(state: PracticeState): PracticeState {
   return { ...state, serve: null, sim: initialState(ball, state.sim.time) };
 }
 
+/** The machine's feeds land at least this far from the net. */
+const MACHINE_MIN_DEPTH = 5;
+
 /**
  * A ball machine at the far end, landing a ball near the player with some
  * variety. `random` returns numbers in [0, 1).
@@ -272,12 +275,14 @@ export function feedMachine(
   const f = forwardZ(state.end);
   const hl = world.court.floor.length / 2;
   const { x, z } = state.motion.position;
-  const from = vec((random() - 0.5) * 4, 1.2, -f * (hl - 1.5));
-  // Bounce a few metres in front of the player, so it rises to them.
-  const target = vec(x + (random() - 0.5) * 3, world.ball.radius, z + f * (2.5 + random() * 2));
+  const from = vec((random() - 0.5) * 4, 1.2, f * (hl - 1.5));
+  // Bounce a little in front of the player, so it rises to them, but far
+  // enough past the net that a fast feed can drop there.
+  const fromNet = Math.max(MACHINE_MIN_DEPTH, -f * z - 1.5 - random() * 1.5);
+  const target = vec(x + (random() - 0.5) * 3, world.ball.radius, -f * fromNet);
   // Travelling -f·z, spin about +f·x is backspin.
   const spin = vec(f * (40 + random() * 80), 0, 0);
-  const velocity = aimAt(world.ball, from, target, spin, { speed: 12 + random() * 5 });
+  const velocity = aimAt(world.ball, from, target, spin, { speed: 17 + random() * 4 });
   return {
     ...state,
     serve: null,
