@@ -89,7 +89,15 @@ export function startPlay(
   labels: Labels,
 ): { readonly state: PlayState; readonly calls: readonly TeachingEvent[] } {
   const server = coinToss(config.players, random);
-  const match = startMatch(world.court, config, server);
+  return {
+    state: playFrom(world, startMatch(world.court, config, server)),
+    calls: [teach("coinToss", `${labels[server]} to serve`)],
+  };
+}
+
+/** Play from any point in a match, e.g. a lesson's setup, with the next rest about to start. */
+export function playFrom(world: World, match: MatchState): PlayState {
+  const config = match.config;
   const athlete = (id: PlayerId): Athlete => ({
     id,
     motion: { position: { x: 0, z: 0 }, velocity: { x: 0, z: 0 } },
@@ -107,10 +115,7 @@ export function startPlay(
     phase: "play",
     since: 0,
   };
-  return {
-    state: setUpRest(world, blank),
-    calls: [teach("coinToss", `${labels[server]} to serve`)],
-  };
+  return setUpRest(world, blank);
 }
 
 export function athleteOf(s: PlayState, id: PlayerId): Athlete {
