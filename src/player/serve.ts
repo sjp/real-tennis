@@ -177,20 +177,19 @@ export function handPosition(at: FloorPoint, end: Side, height: number): Vec3 {
 const TOSS_RELEASE = 1.5;
 /** How far above the contact point an overarm toss rises. */
 const TOSS_RISE = 0.5;
-/** How far above the contact point an underarm serve is dropped from. */
-const DROP_HEIGHT = 0.4;
+/**
+ * An underarm toss is lifted gently from just above the contact point, so
+ * there's time to swing after tossing.
+ */
+const UNDERARM_RELEASE = 0.3;
+const UNDERARM_RISE = 0.8;
 
 /** The ball leaving the server's hand: tossed up, or dropped. */
 export function toss(style: ServeStyle, at: FloorPoint, end: Side, gravity: number): BallState {
-  if (!style.overarm)
-    return {
-      position: handPosition(at, end, style.contactHeight + DROP_HEIGHT),
-      velocity: ZERO,
-      spin: ZERO,
-    };
-  const apex = style.contactHeight + TOSS_RISE;
-  const up = Math.sqrt(2 * gravity * (apex - TOSS_RELEASE));
-  return { position: handPosition(at, end, TOSS_RELEASE), velocity: vec(0, up, 0), spin: ZERO };
+  const release = style.overarm ? TOSS_RELEASE : style.contactHeight + UNDERARM_RELEASE;
+  const apex = style.contactHeight + (style.overarm ? TOSS_RISE : UNDERARM_RISE);
+  const up = Math.sqrt(2 * gravity * (apex - release));
+  return { position: handPosition(at, end, release), velocity: vec(0, up, 0), spin: ZERO };
 }
 
 /** The serve's launch velocity, nudged a few degrees by the move input. */

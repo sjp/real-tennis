@@ -156,6 +156,13 @@ function miss(m: Motion, end: Side, backhand: boolean, b: Vec3): number {
   return Math.hypot(b.x - c.x, b.z - c.z) + height;
 }
 
+/** How far a tossed ball at `b` is from the serving contact point. */
+function serveMiss(state: PracticeState, b: Vec3): number {
+  const style = SERVE_STYLES[state.serveStyle]!;
+  const c = handPosition(state.motion.position, state.end, style.contactHeight);
+  return Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z);
+}
+
 /**
  * Times a swing: when the ball was best placed, against when the racket got
  * there. Returns null if the ball never came within reach.
@@ -166,13 +173,11 @@ export function timeSwing(
 ): { readonly timing: Timing; readonly backhand: boolean } | null {
   const contact = swing.start + SWING_TIME;
   const serving = state.serve === "tossed";
-  const style = SERVE_STYLES[state.serveStyle]!;
   let best = { cost: Infinity, time: 0, backhand: false };
   swing.path.forEach((b, i) => {
     const time = swing.start + i * STEP;
     if (serving) {
-      const c = handPosition(state.motion.position, state.end, style.contactHeight);
-      const cost = Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z);
+      const cost = serveMiss(state, b);
       if (cost < best.cost) best = { cost, time, backhand: false };
       return;
     }
@@ -229,11 +234,12 @@ export function practiceStep(
   if (swing && !swing.contact && s.sim.time >= swing.start + SWING_TIME) {
     const timed = timeSwing(s, swing);
     const ball = s.sim.ball;
+    const off =
+      s.serve === "tossed"
+        ? serveMiss(s, ball.position)
+        : miss(s.motion, s.end, timed?.backhand ?? false, ball.position);
     const reachable =
-      timed !== null &&
-      timed.timing.grade !== "miss" &&
-      !s.sim.captured &&
-      miss(s.motion, s.end, timed.backhand, ball.position) <= STRETCH;
+      timed !== null && timed.timing.grade !== "miss" && !s.sim.captured && off <= STRETCH;
     s = { ...s, swing: { ...swing, contact: true, backhand: timed?.backhand ?? false } };
     if (!reachable) notices.push({ type: "whiff" });
     else {

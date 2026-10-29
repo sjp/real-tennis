@@ -3,8 +3,8 @@ export const SWING_TIME = 0.25;
 
 /** Timing windows, in seconds either side of perfect. ⚠ verify */
 export const PERFECT = 0.03;
-export const GOOD = 0.09;
-export const POOR = 0.15;
+export const GOOD = 0.1;
+export const POOR = 0.2;
 
 /** Most a shot is pulled or pushed off line, in radians. */
 export const MAX_PULL = (15 * Math.PI) / 180;
