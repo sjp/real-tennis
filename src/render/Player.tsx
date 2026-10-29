@@ -1,12 +1,11 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { ExtrudeGeometry, Shape, Vector3, type Group } from "three";
-import { timeSwing, FOLLOW_THROUGH } from "../game/player.ts";
+import { timeSwing, FOLLOW_THROUGH, type Athlete } from "../game/player.ts";
 import { standardPlayer } from "../player/movement.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import { ARM, groundstrokeArm, HANDLE_LENGTH, HEAD_LENGTH, serveArm } from "./serveArm.ts";
-import type { Store } from "./Practice.tsx";
 
 const DEG = Math.PI / 180;
 
@@ -76,7 +75,10 @@ function Limb({
   );
 }
 
-export function Player({ store }: { store: Store }) {
+/** What the figure is drawn from, read every frame. */
+export type PlayerView = () => { readonly athlete: Athlete; readonly time: number };
+
+export function Player({ view, shirt = SHIRT }: { view: PlayerView; shirt?: string }) {
   const body = useRef<Group>(null);
   const arm = useRef<Group>(null);
   const free = useRef<Group>(null);
@@ -88,14 +90,14 @@ export function Player({ store }: { store: Store }) {
   const shoulder = SHOULDER_Y + 0.03;
 
   useFrame(() => {
-    const s = store.get();
+    const { athlete: s, time } = view();
     if (!body.current || !arm.current) return;
     body.current.position.set(s.motion.position.x, 0, s.motion.position.z);
     body.current.rotation.y = s.end === "service" ? 0 : Math.PI;
     let angle = -20;
     let backhand = false;
     if (s.swing) {
-      angle = armAngle(s.sim.time - s.swing.start);
+      angle = armAngle(time - s.swing.start);
       backhand = s.swing.contact ? s.swing.backhand : (timeSwing(s, s.swing)?.backhand ?? false);
     }
     // Facing +z the right is -x. The arm points along its local +x; turn it
@@ -105,7 +107,7 @@ export function Player({ store }: { store: Store }) {
       const style = SERVE_STYLES[s.serveStyle]!;
       const pivot = new Vector3(-SHOULDER_WIDTH, SHOULDER_Y, 0);
       const idle = groundstrokeArm(-20, false);
-      const t = s.sim.time - s.swing.start;
+      const t = time - s.swing.start;
       const pose = serveArm(t, style.overarm, style.contactHeight, pivot, idle);
       arm.current.quaternion.copy(pose.arm);
       wrist.current?.rotation.set(0, 0, pose.wrist);
@@ -116,8 +118,8 @@ export function Player({ store }: { store: Store }) {
 
     // Legs and the free arm swing with the distance run.
     const st = stride.current;
-    const dt = Math.max(0, Math.min(0.1, s.sim.time - st.last));
-    st.last = s.sim.time;
+    const dt = Math.max(0, Math.min(0.1, time - st.last));
+    st.last = time;
     const speed = Math.hypot(s.motion.velocity.x, s.motion.velocity.z);
     st.phase += speed * dt * STEPS_PER_METRE * Math.PI;
     const swing = Math.sin(st.phase) * STRIDE * Math.min(1, speed / runSpeed);
@@ -155,7 +157,7 @@ export function Player({ store }: { store: Store }) {
       </mesh>
       <mesh position={[0, (HIP + shoulder) / 2 + 0.02, 0]} scale={[1, 1, 0.7]}>
         <cylinderGeometry args={[0.22, 0.17, shoulder - HIP + 0.1, 10]} />
-        <meshStandardMaterial color={SHIRT} flatShading />
+        <meshStandardMaterial color={shirt} flatShading />
       </mesh>
       {/* Neck and head, with hair. */}
       <mesh position={[0, shoulder + 0.07, 0]}>
@@ -173,7 +175,7 @@ export function Player({ store }: { store: Store }) {
       </mesh>
       {/* The free arm, hanging from the other shoulder. */}
       <group ref={free} position={[SHOULDER_WIDTH, shoulder - 0.05, 0]}>
-        <Limb length={0.32} top={0.05} bottom={0.042} color={SHIRT} />
+        <Limb length={0.32} top={0.05} bottom={0.042} color={shirt} />
         <group position={[0, -0.3, 0]} rotation={[-0.5, 0, 0]}>
           <Limb length={0.28} top={0.04} bottom={0.033} color={SKIN} />
         </group>
@@ -183,7 +185,7 @@ export function Player({ store }: { store: Store }) {
         <group rotation={[0, 0, ARM.tilt]}>
           <mesh position={[0.13, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.042, 0.05, 0.26, 8]} />
-            <meshStandardMaterial color={SHIRT} flatShading />
+            <meshStandardMaterial color={shirt} flatShading />
           </mesh>
           <mesh position={[0.38, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.032, 0.04, 0.24, 8]} />

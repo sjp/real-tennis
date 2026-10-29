@@ -1,0 +1,123 @@
+import { useFrame, useThree } from "@react-three/fiber";
+import { useRef } from "react";
+import { Vector3, type Mesh } from "three";
+import { standardCourt as court } from "../court/standard.ts";
+import type { FloorPoint, Side } from "../court/types.ts";
+import { ABOVE, BEHIND } from "./view.ts";
+import { assist, type Assist } from "../game/assist.ts";
+import type { Motion } from "../player/movement.ts";
+import { secondGalleryLineZ } from "../player/serve.ts";
+import { createWorld, predict, type Prediction, type SimState } from "../sim/world.ts";
+
+const world = createWorld(court);
+const hw = court.floor.width / 2;
+const hl = court.floor.length / 2;
+
+const LOOK_AHEAD = 8;
+/** Seconds for the camera to settle; about 1 s to swing round on a change of ends. */
+const FOLLOW = 0.15;
+const TURN = 0.3;
+/** Seconds of ball flight the hit assist looks ahead. */
+const ASSIST_HORIZON = 3;
+
+/**
+ * Keeps the camera behind and above a player, looking down the court and
+ * kept inside the walls. Swings round on a change of ends.
+ */
+export function FollowCamera({ target }: { target: () => { at: FloorPoint; end: Side } }) {
+  const camera = useThree((s) => s.camera);
+  const look = useRef(new Vector3(0, 1, 0));
+  const yaw = useRef<number | null>(null);
+  useFrame((_, delta) => {
+    const { at, end } = target();
+    const want = end === "service" ? 0 : Math.PI;
+    yaw.current ??= want;
+    let turn = want - yaw.current;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    yaw.current += turn * Math.min(1, delta / TURN);
+    const fx = Math.sin(yaw.current);
+    const fz = Math.cos(yaw.current);
+    const { x, z } = at;
+    let cz = z - fz * BEHIND;
+    const over = Math.max(0, Math.abs(cz) - (hl - 0.3));
+    cz = Math.sign(cz) * Math.min(Math.abs(cz), hl - 0.3);
+    const cx = Math.max(-hw + 0.3, Math.min(hw - 0.3, x - fx * BEHIND));
+    const k = Math.min(1, delta / FOLLOW);
+    camera.position.lerp(new Vector3(cx, ABOVE + over * 0.8, cz), k);
+    look.current.lerp(new Vector3(x + fx * LOOK_AHEAD, 0.5, z + fz * LOOK_AHEAD), k);
+    camera.lookAt(look.current);
+  });
+  return null;
+}
+
+/**
+ * The hit-assist rings: where the ball next bounces, and where the player can
+ * first reach it. Re-predicts whenever the ball changes course, and a few
+ * times a second.
+ */
+export function AssistRings({
+  view,
+  on,
+}: {
+  view: () => { sim: SimState; motion: Motion; end: Side };
+  on: boolean;
+}) {
+  const bounceRing = useRef<Mesh>(null);
+  const interceptRing = useRef<Mesh>(null);
+  const plan = useRef<{ prediction: Prediction | null; at: number; key: string }>({
+    prediction: null,
+    at: -1,
+    key: "",
+  });
+  useFrame(() => {
+    const { sim, motion, end } = view();
+    const p = plan.current;
+    const key = `${sim.lastHitTime}|${sim.lastFloorTime}|${sim.lastWallTime}|${sim.asleep}`;
+    if (key !== p.key || sim.time - p.at > 0.25 || sim.time < p.at) {
+      p.prediction = sim.asleep ? null : predict(world, sim, ASSIST_HORIZON);
+      p.at = sim.time;
+      p.key = key;
+    }
+    const rings: Assist = p.prediction
+      ? assist(p.prediction, motion, end, sim.time)
+      : { bounce: null, intercept: null };
+    for (const [mesh, at] of [
+      [bounceRing.current, rings.bounce],
+      [interceptRing.current, rings.intercept],
+    ] as const) {
+      if (!mesh) continue;
+      mesh.visible = on && at !== null;
+      if (at) mesh.position.set(at.x, 0.01, at.z);
+    }
+  });
+  return (
+    <>
+      <mesh ref={bounceRing} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[0.18, 0.24, 32]} />
+        <meshBasicMaterial color="#ffd166" transparent opacity={0.8} />
+      </mesh>
+      <mesh ref={interceptRing} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[0.3, 0.38, 32]} />
+        <meshBasicMaterial color="#06d6a0" transparent opacity={0.8} />
+      </mesh>
+    </>
+  );
+}
+
+/** The Second Gallery line, lit up while serving (Law 8.1(d)(i)). */
+export function ServeLine({ visible }: { visible: () => boolean }) {
+  const mesh = useRef<Mesh>(null);
+  useFrame(() => {
+    if (mesh.current) mesh.current.visible = visible();
+  });
+  return (
+    <mesh
+      ref={mesh}
+      position={[0, 0.004, secondGalleryLineZ(court)]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <planeGeometry args={[court.floor.width, 0.1]} />
+      <meshBasicMaterial color="#ff5d5d" />
+    </mesh>
+  );
+}
