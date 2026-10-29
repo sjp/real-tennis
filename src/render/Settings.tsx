@@ -4,6 +4,7 @@ import { createExplainStore, useExplainer } from "./explainStore.ts";
 import { loadDone, saveDone } from "./progress.ts";
 import { settings, useSettings } from "./settings.ts";
 import { HIGHLIGHT } from "./view.ts";
+import { TouchSetting } from "./TouchSetting.tsx";
 import { Volume } from "./Volume.tsx";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -35,6 +36,9 @@ export function Settings() {
         <div style={{ fontSize: 20, color: "#ffffff" }}>Settings</div>
         <Row label="Sound">
           <Volume />
+        </Row>
+        <Row label="Controls">
+          <TouchSetting />
         </Row>
         <Row label="Hit assist">
           <button onClick={() => settings.set({ assist: !s.assist })}>

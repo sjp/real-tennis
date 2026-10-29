@@ -8,6 +8,9 @@ import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts"
 import { playerCapsule, type Athlete } from "../game/player.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
+import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
+import { useTouchShown } from "./inputMode.ts";
+import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
 import { settings, useSettings, type MatchSetup as Setup } from "./settings.ts";
@@ -100,12 +103,14 @@ function tally(p: PlayState): string {
 /** Steps the match at a fixed rate, with the AI playing the opponent. */
 function Loop({
   game,
+  pad,
   level,
   explain,
   isPaused,
   onHud,
 }: {
   game: Store;
+  pad: Touch;
   level: AiLevel;
   explain: ExplainStore;
   /** Play is frozen, e.g. while the Marker explains. */
@@ -120,7 +125,7 @@ function Loop({
 
   useFrame((_, delta) => {
     const l = loop.current;
-    let input = keys.read();
+    let input = mergeInputs(keys.read(), pad.read());
     // Frozen while the Marker explains; the key that resumes isn't a swing.
     const paused = isPaused();
     if (paused || l.paused) {
@@ -204,6 +209,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   });
   const ex = useExplainer(explain);
   const ui = usePlayUi(explain);
+  const [pad] = useState(createTouch);
+  const touchShown = useTouchShown();
   const isPaused = () => ui.held() || explain.get().showing !== null;
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
@@ -238,7 +245,14 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           })}
           shirt={OPPONENT_SHIRT}
         />
-        <Loop game={game} level={setup.level} explain={explain} isPaused={isPaused} onHud={onHud} />
+        <Loop
+          game={game}
+          pad={pad}
+          level={setup.level}
+          explain={explain}
+          isPaused={isPaused}
+          onHud={onHud}
+        />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
         <ChaseMarkers chases={hud.chases} />
@@ -294,15 +308,22 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           <button onClick={onQuit}>New match</button>
         </div>
       )}
-      <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-        {HELP.map((h) => (
-          <div key={h}>{h}</div>
-        ))}
-        <div>
-          Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
-          {ex.on ? "on" : "off"}
+      {touchShown ? (
+        !ui.menu &&
+        !ui.rules &&
+        !ex.showing &&
+        !hud.over && <TouchControls touch={pad} athlete={me} onPause={() => ui.setMenu(true)} />
+      ) : (
+        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+          {HELP.map((h) => (
+            <div key={h}>{h}</div>
+          ))}
+          <div>
+            Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
+            {ex.on ? "on" : "off"}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

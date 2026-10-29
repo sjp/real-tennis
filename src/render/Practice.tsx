@@ -12,6 +12,9 @@ import {
   type PracticeState,
 } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
+import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
+import { useTouchShown } from "./inputMode.ts";
+import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { createWorld, STEP } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
@@ -71,11 +74,13 @@ interface Hud {
 /** Steps the game at a fixed rate, and draws the ball between steps. */
 function Loop({
   store,
+  pad,
   explain,
   isPaused,
   onHud,
 }: {
   store: Store;
+  pad: Touch;
   explain: ExplainStore;
   /** Play is frozen, e.g. while the Marker explains. */
   isPaused: () => boolean;
@@ -89,7 +94,7 @@ function Loop({
 
   useFrame((_, delta) => {
     const l = loop.current;
-    let input = keys.read();
+    let input = mergeInputs(keys.read(), pad.read());
     // Frozen while the Marker explains; the key that resumes isn't a swing.
     const paused = isPaused();
     if (paused || l.paused) {
@@ -142,12 +147,28 @@ const HELP = [
   "M: court markings · X: explanations on/off · ?: rules · Esc: pause",
 ];
 
+interface Command {
+  readonly code: string;
+  /** Its touch button. */
+  readonly label: string;
+  readonly run: (s: PracticeState) => PracticeState;
+}
+
+const COMMANDS: readonly Command[] = [
+  { code: "KeyR", label: "Drop", run: (s) => feedDrop(court, s) },
+  { code: "KeyF", label: "Feed", run: (s) => feedMachine(world, s, Math.random) },
+  { code: "KeyQ", label: "Serve", run: (s) => startServe(court, s) },
+  { code: "KeyE", label: "Ends", run: (s) => changeEnds(court, s) },
+];
+
 /** Solo practice: move, hit, and serve, with no opponent. */
 export function Practice() {
   const [store] = useState(createStore);
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
   const ui = usePlayUi(explain);
+  const [pad] = useState(createTouch);
+  const touchShown = useTouchShown();
   const held = ui.held;
   const isPaused = () => ui.held() || explain.get().showing !== null;
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
@@ -160,26 +181,22 @@ export function Practice() {
   const onHud = (h: HudChange) =>
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
 
+  const [command] = useState(() => (c: Command) => {
+    // No feeds while paused, or while the Marker explains.
+    if (held() || explain.get().showing) return;
+    store.set(c.run(store.get()));
+    setHud((h) => ({ ...h, choice: choice(store.get()), calls: [], event: null }));
+  });
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      const s = store.get();
-      const command: Record<string, () => PracticeState> = {
-        KeyR: () => feedDrop(court, s),
-        KeyF: () => feedMachine(world, s, Math.random),
-        KeyE: () => changeEnds(court, s),
-        KeyQ: () => startServe(court, s),
-      };
-      // No feeds while paused, or while the Marker explains.
-      if (held() || explain.get().showing) return;
-      const run = command[e.code];
-      if (!run) return;
-      store.set(run());
-      setHud((h) => ({ ...h, choice: choice(store.get()), calls: [], event: null }));
+      const c = COMMANDS.find((c) => c.code === e.code);
+      if (c) command(c);
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [store, explain, held]);
+  }, [command]);
 
   const s = store.get();
   const { assist } = useSettings();
@@ -195,7 +212,7 @@ export function Practice() {
         <Ears />
         <ServeLine visible={() => store.get().serve !== null} />
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
-        <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
+        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
         <AssistRings view={() => store.get()} on={assist} />
@@ -221,14 +238,27 @@ export function Practice() {
           </div>
         ))}
       </div>
-      <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-        {HELP.map((h) => (
-          <div key={h}>{h}</div>
-        ))}
-        <div>
-          Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
+      {touchShown ? (
+        !ui.menu &&
+        !ui.rules &&
+        !ex.showing && (
+          <TouchControls
+            touch={pad}
+            athlete={s}
+            extras={COMMANDS.map((c) => ({ label: c.label, onPress: () => command(c) }))}
+            onPause={() => ui.setMenu(true)}
+          />
+        )
+      ) : (
+        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+          {HELP.map((h) => (
+            <div key={h}>{h}</div>
+          ))}
+          <div>
+            Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
+          </div>
         </div>
-      </div>
+      )}
       <PauseMenu
         ui={ui}
         explain={explain}

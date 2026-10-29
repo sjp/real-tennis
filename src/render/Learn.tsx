@@ -5,6 +5,9 @@ import { featureShape } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf } from "../game/play.ts";
 import { keyboard } from "../input/keyboard.ts";
+import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
+import { useTouchShown } from "./inputMode.ts";
+import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { createWorld, STEP, type SimState } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
@@ -66,11 +69,13 @@ interface Hud {
 /** Steps the lesson at a fixed rate. */
 function Loop({
   store,
+  pad,
   explain,
   isPaused,
   onHud,
 }: {
   store: Store;
+  pad: Touch;
   explain: ExplainStore;
   isPaused: () => boolean;
   onHud: (h: (old: Hud) => Partial<Hud>) => void;
@@ -83,7 +88,7 @@ function Loop({
 
   useFrame((_, delta) => {
     const l = loop.current;
-    let input = keys.read();
+    let input = mergeInputs(keys.read(), pad.read());
     // Frozen while paused; the key that resumes isn't a swing.
     const paused = isPaused();
     if (paused || l.paused) {
@@ -162,6 +167,8 @@ function LessonGame({
   const ex = useExplainer(explain);
   const [intro, setIntro] = useState(true);
   const ui = usePlayUi(explain);
+  const [pad] = useState(createTouch);
+  const touchShown = useTouchShown();
   const held = useRef({ intro: true });
   const isPaused = () => held.current.intro || ui.held() || explain.get().showing !== null;
   const [hud, setHud] = useState<Hud>(() => ({
@@ -227,7 +234,7 @@ function LessonGame({
             shirt={OPPONENT_SHIRT}
           />
         )}
-        <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
+        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
         <ChaseMarkers chases={chases} />
@@ -275,11 +282,19 @@ function LessonGame({
           </div>
         ))}
       </div>
-      <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-        {HELP.map((h) => (
-          <div key={h}>{h}</div>
-        ))}
-      </div>
+      {touchShown ? (
+        !intro &&
+        !hud.done &&
+        !ui.menu &&
+        !ui.rules &&
+        !ex.showing && <TouchControls touch={pad} athlete={me} onPause={() => ui.setMenu(true)} />
+      ) : (
+        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+          {HELP.map((h) => (
+            <div key={h}>{h}</div>
+          ))}
+        </div>
+      )}
       {intro && (
         <Centred>
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>{lesson.title}</div>
