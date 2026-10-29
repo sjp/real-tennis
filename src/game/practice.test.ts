@@ -25,14 +25,16 @@ const swing: InputState = { ...IDLE, swing: true };
 function run(state: PracticeState, seconds: number, input: InputState = IDLE) {
   const events: SimEvent[] = [];
   const notices: Notice[] = [];
+  const calls: string[] = [];
   let s = state;
   for (let i = 0; i < Math.round(seconds / STEP); i++) {
     const r = practiceStep(world, s, i === 0 ? input : { ...input, swing: false, select: null });
     s = r.state;
     events.push(...r.events);
     notices.push(...r.notices);
+    calls.push(...r.calls.map((c) => c.id));
   }
-  return { state: s, events, notices };
+  return { state: s, events, notices, calls };
 }
 
 /** Seconds until the ball is best placed for a forehand. */
@@ -56,7 +58,7 @@ function swingAt(state: PracticeState, early: number, input: InputState = IDLE) 
   return run(before.state, SWING_TIME + 3, { ...input, swing: true });
 }
 
-const fed = feedDrop(initialPractice(world));
+const fed = feedDrop(court, initialPractice(world));
 
 describe("hitting", () => {
   it("hits a well-timed drop feed perfectly to the far end", () => {
@@ -90,24 +92,47 @@ describe("serving", () => {
   }
 
   it("serves a good Railroad on to the Service Penthouse", () => {
-    const { notices, events } = serve(ready);
+    const { notices, events, calls, state } = serve(ready);
     expect(notices[0]).toMatchObject({ type: "shot", shot: "Railroad" });
     expect(events.map((e) => e.surface)).toContain("penthouse:service");
+    // Unreturned, it Falls in the Service Court (Law 11.1(b)).
+    expect([...calls, ...run(state, 4).calls]).toEqual(["goodService", "beyondServiceLine"]);
   });
 
   it("faults a server on the Second Gallery line", () => {
     const z = secondGalleryLineZ(court);
     const over = { ...ready, motion: { ...ready.motion, position: { x: 2, z } } };
-    expect(serve(over).notices).toContainEqual({ type: "serverFault", reason: "line" });
+    const served = serve(over);
+    expect(served.notices).toContainEqual({ type: "serverFault", reason: "line" });
+    expect(served.calls).toEqual(["faultLine"]);
   });
 
   it("faults a server who misses the ball", () => {
-    const { notices } = run(ready, 2, swing);
+    const { notices, calls } = run(ready, 2, swing);
     expect(notices).toContainEqual({ type: "serverFault", reason: "missed" });
+    expect(calls).toEqual(["faultMissed"]);
   });
 });
 
 describe("practice", () => {
+  it("calls the player's shot off a feed", () => {
+    // A perfect cut to the far end, unreturned by the machine.
+    const { state, calls } = swingAt(fed, 0);
+    expect(state.rally?.striker).toBe("human");
+    expect(calls).toHaveLength(1);
+    expect(state.rally?.outcome).toMatchObject({ kind: expect.stringMatching(/point|chase/) });
+  });
+
+  it("judges an unreturned machine feed as a chase on the player's side", () => {
+    let seed = 3;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const { state } = run(feedMachine(world, fed, random), 4);
+    expect(state.rally?.outcome).toMatchObject({
+      kind: "chase",
+      call: { mark: { side: "service" } },
+    });
+  });
+
   it("feeds from the machine to land near the player", () => {
     let seed = 1;
     const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { classifyFloorPoint } from "../court/classify.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { IDLE } from "../input/input.ts";
+import { rally, startRally } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { hit } from "../sim/racket.ts";
 import { createWorld, initialState, predict, step, type SimState } from "../sim/world.ts";
@@ -37,28 +37,11 @@ function serve(style: ServeStyle, error = 0): readonly SimEvent[] {
   return [...struck.events, ...predict(world, struck.state, 6).events];
 }
 
-/**
- * A simplified check of Law 8.1(d), until the rules engine (050): the ball
- * touches only the Side Penthouse or the Service Wall, not first on the
- * edge, before the Service Penthouse; then no Main Wall or Tambour before it
- * drops in the Service Court or enters the Winning Gallery.
- */
+/** Law 8.1(d), judged by the rules engine: no fault, and not left undecided. */
 function goodService(events: readonly SimEvent[]): boolean {
-  const rest = events.filter((e) => e.type !== "racketHit" && e.type !== "netCrossed");
-  const reached = rest.findIndex((e) => e.surface === "penthouse:service");
-  if (reached < 0) return false;
-  const before = rest.slice(0, reached);
-  if (before[0]?.type === "penthouseHit" && before[0].edge) return false;
-  if (!before.every((e) => e.surface === "penthouse:side" || e.surface === "serviceWall"))
-    return false;
-  for (const e of rest.slice(reached + 1)) {
-    if (e.type === "enteredOpening") return e.opening === "winningGallery";
-    if (e.type === "floorBounce")
-      return classifyFloorPoint(court, { x: e.position.x, z: e.position.z }).inServiceCourt;
-    if (e.surface === "mainWall" || e.type === "tambourHit") return false;
-    if (e.type === "outOfCourt" || e.type === "netHit" || e.type === "playerHit") return false;
-  }
-  return false;
+  let state = startRally({ court, server: "server", receiver: "receiver", playingFor: null });
+  for (const e of events) state = rally(state, e).state;
+  return state.outcome !== null && state.outcome.kind !== "fault";
 }
 
 describe("serve styles", () => {

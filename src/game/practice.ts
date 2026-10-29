@@ -10,6 +10,14 @@ import {
   toss,
 } from "../player/serve.ts";
 import { aimAt, planShot } from "../player/shot.ts";
+import {
+  rally,
+  startRally,
+  type PlayerId,
+  type RallyInput,
+  type RallyState,
+} from "../rules/rally.ts";
+import type { TeachingEvent } from "../rules/teaching.ts";
 import { grade, POOR, SWING_TIME, type Timing } from "../player/timing.ts";
 import type { BallState } from "../sim/ball.ts";
 import type { SimEvent } from "../sim/events.ts";
@@ -26,6 +34,8 @@ import {
 } from "../sim/world.ts";
 
 export const PLAYER_ID = "human";
+/** The ball machine, standing in for an opponent at the far end. */
+export const MACHINE_ID = "machine";
 const params = standardPlayer;
 
 /** How long the follow-through lasts after contact. */
@@ -61,6 +71,8 @@ export interface PracticeState {
   readonly swing: Swinging | null;
   /** Null when not serving; otherwise whether the ball is tossed yet. */
   readonly serve: "ready" | "tossed" | null;
+  /** The rules engine's view of the ball in play, if it's a rest it can judge. */
+  readonly rally: RallyState | null;
 }
 
 /** Things the game reports beyond the physics, for the HUD and 050. */
@@ -77,6 +89,8 @@ export interface PracticeResult {
   readonly state: PracticeState;
   readonly events: readonly SimEvent[];
   readonly notices: readonly Notice[];
+  /** The Marker's calls from the rules engine. */
+  readonly calls: readonly TeachingEvent[];
 }
 
 /** A ball held still at `at`, e.g. out of the way or in the server's hand. */
@@ -99,7 +113,26 @@ export function initialPractice(world: World): PracticeState {
     serveStyle: 0,
     swing: null,
     serve: null,
+    rally: null,
   };
+}
+
+/** A rest with the machine at the far end. `striker` starts one already struck. */
+function practiceRally(
+  court: CourtDefinition,
+  end: Side,
+  striker: PlayerId | null = null,
+): RallyState {
+  const human = end === "service";
+  return startRally(
+    {
+      court,
+      server: human ? PLAYER_ID : MACHINE_ID,
+      receiver: human ? MACHINE_ID : PLAYER_ID,
+      playingFor: null,
+    },
+    striker,
+  );
 }
 
 export function playerCapsule(m: Motion): PlayerCapsule {
@@ -171,6 +204,8 @@ export function practiceStep(
   input: InputState,
 ): PracticeResult {
   const notices: Notice[] = [];
+  /** What the rules engine sees, in order. */
+  const judged: RallyInput[] = [];
   let s = select(state, input.select);
 
   if (input.swing && s.serve === "ready") {
@@ -203,8 +238,10 @@ export function practiceStep(
     if (!reachable) notices.push({ type: "whiff" });
     else {
       const serving = s.serve === "tossed";
-      if (serving && overServiceLine(world.court, params, s.motion.position))
+      if (serving && overServiceLine(world.court, params, s.motion.position)) {
         notices.push({ type: "serverFault", reason: "line" });
+        judged.push({ type: "serverFault", reason: "line" });
+      }
       const racket = serving
         ? planServe(
             world,
@@ -218,6 +255,7 @@ export function practiceStep(
         : planShot(world, PLAYER_ID, s.shot, ball, s.end, input.move, timed.timing).racket;
       const struck = hit(world.ball, s.sim, racket);
       events.push(...struck.events);
+      judged.push(...struck.events);
       notices.push({
         type: "shot",
         shot: serving ? SERVE_STYLES[s.serveStyle]!.name : s.shot,
@@ -237,19 +275,29 @@ export function practiceStep(
 
   const stepped = step(world, s.sim, [playerCapsule(s.motion)]);
   events.push(...stepped.events);
+  judged.push(...stepped.events);
   s = { ...s, sim: stepped.state };
   if (s.serve === "tossed" && stepped.events.some((e) => e.type === "floorBounce")) {
     notices.push({ type: "serverFault", reason: "missed" });
+    judged.push({ type: "serverFault", reason: "missed" });
     s = { ...s, serve: null };
   }
-  return { state: s, events, notices };
+
+  const calls: TeachingEvent[] = [];
+  let judging = s.rally;
+  for (const e of judging ? judged : []) {
+    const r = rally(judging!, e);
+    judging = r.state;
+    calls.push(...r.teaching);
+  }
+  return { state: { ...s, rally: judging }, events, notices, calls };
 }
 
 /**
  * Lobs a ball up just ahead of the player, coming back towards them, so it
  * bounces and rises through the forehand's hitting zone.
  */
-export function feedDrop(state: PracticeState): PracticeState {
+export function feedDrop(court: CourtDefinition, state: PracticeState): PracticeState {
   const f = forwardZ(state.end);
   const { x, z } = state.motion.position;
   const ball: BallState = {
@@ -257,7 +305,16 @@ export function feedDrop(state: PracticeState): PracticeState {
     velocity: vec(0, 1, -f * 1.4),
     spin: ZERO,
   };
-  return { ...state, serve: null, sim: initialState(ball, state.sim.time) };
+  // Judged as if the machine had sent it over the net.
+  const fed = practiceRally(court, state.end, MACHINE_ID);
+  const over = rally(fed, {
+    type: "netCrossed",
+    from: state.end === "service" ? "hazard" : "service",
+    time: state.sim.time,
+    position: ball.position,
+    surface: "net",
+  }).state;
+  return { ...state, serve: null, rally: over, sim: initialState(ball, state.sim.time) };
 }
 
 /** The machine's feeds land at least this far from the net. */
@@ -286,6 +343,7 @@ export function feedMachine(
   return {
     ...state,
     serve: null,
+    rally: practiceRally(world.court, state.end, MACHINE_ID),
     sim: initialState({ position: from, velocity, spin }, state.sim.time),
   };
 }
@@ -295,7 +353,13 @@ export function changeEnds(court: CourtDefinition, state: PracticeState): Practi
   const end: Side = state.end === "service" ? "hazard" : "service";
   const { x, z } = state.motion.position;
   const position = clampToEnd(court, params, end, { x, z: -z });
-  return { ...state, end, serve: null, motion: { position, velocity: { x: 0, z: 0 } } };
+  return {
+    ...state,
+    end,
+    serve: null,
+    rally: null,
+    motion: { position, velocity: { x: 0, z: 0 } },
+  };
 }
 
 /** Takes the player to the serving spot with a ball in hand. Serving is from the service end. */
@@ -305,6 +369,7 @@ export function startServe(court: CourtDefinition, state: PracticeState): Practi
     end: "service",
     serve: "ready",
     swing: null,
+    rally: practiceRally(court, "service"),
     motion: { position: serveSpot(court), velocity: { x: 0, z: 0 } },
   };
 }

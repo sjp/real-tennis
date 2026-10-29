@@ -56,10 +56,13 @@ function choice(s: PracticeState): string {
   return s.serve !== null ? `Serve: ${SERVE_STYLES[s.serveStyle]!.name}` : `Shot: ${s.shot}`;
 }
 
+type HudChange = Partial<Hud> | ((old: Hud) => Partial<Hud>);
+
 interface Hud {
   readonly choice: string;
   readonly last: string | null;
-  readonly fault: string | null;
+  /** The Marker's calls for the current rest. */
+  readonly calls: readonly string[];
   readonly event: string | null;
   readonly assist: boolean;
 }
@@ -67,19 +70,15 @@ interface Hud {
 function describeNotice(n: Notice): Partial<Hud> {
   switch (n.type) {
     case "whiff":
-      return { last: "Missed it", fault: null };
+      return { last: "Missed it" };
+    // The rules engine calls these.
     case "serverFault":
-      return {
-        fault:
-          n.reason === "line"
-            ? "Fault: on or over the Second Gallery line (Law 8.1(d)(i))"
-            : "Fault: missed the ball (Law 8.1(d)(ii))",
-      };
+      return {};
     case "shot": {
       const ms = Math.round(Math.abs(n.timing.error) * 1000);
       const when =
         n.timing.grade === "perfect" ? "" : ` · ${n.timing.error > 0 ? "early" : "late"} ${ms} ms`;
-      return { last: `${n.shot}: ${n.timing.grade}${when}`, fault: null, event: null };
+      return { last: `${n.shot}: ${n.timing.grade}${when}`, event: null };
     }
   }
 }
@@ -107,7 +106,7 @@ function Loop({
 }: {
   store: Store;
   assistOn: boolean;
-  onHud: (h: Partial<Hud>) => void;
+  onHud: (h: HudChange) => void;
 }) {
   const ball = useRef<Mesh>(null);
   const bounceRing = useRef<Mesh>(null);
@@ -140,6 +139,10 @@ function Loop({
       )
         changed = true;
       for (const n of r.notices) onHud(describeNotice(n));
+      if (r.calls.length > 0)
+        onHud((h) => ({
+          calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-3),
+        }));
       for (const e of r.events) {
         const text = describeEvent(e);
         if (text) onHud({ event: text });
@@ -247,18 +250,19 @@ export function Practice() {
   const [hud, setHud] = useState<Hud>(() => ({
     choice: choice(store.get()),
     last: null,
-    fault: null,
+    calls: [],
     event: null,
     assist: true,
   }));
-  const onHud = (h: Partial<Hud>) => setHud((old) => ({ ...old, ...h }));
+  const onHud = (h: HudChange) =>
+    setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
       const s = store.get();
       const command: Record<string, () => PracticeState> = {
-        KeyR: () => feedDrop(s),
+        KeyR: () => feedDrop(court, s),
         KeyF: () => feedMachine(world, s, Math.random),
         KeyE: () => changeEnds(court, s),
         KeyQ: () => startServe(court, s),
@@ -267,7 +271,7 @@ export function Practice() {
       const run = command[e.code];
       if (!run) return;
       store.set(run());
-      setHud((h) => ({ ...h, choice: choice(store.get()), fault: null, event: null }));
+      setHud((h) => ({ ...h, choice: choice(store.get()), calls: [], event: null }));
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
@@ -292,7 +296,11 @@ export function Practice() {
         <div>{hud.choice}</div>
         {hud.last && <div>{hud.last}</div>}
         {hud.event && <div style={{ color: "#4cc9f0" }}>{hud.event}</div>}
-        {hud.fault && <div style={{ color: "#ff5d5d" }}>{hud.fault}</div>}
+        {hud.calls.map((c, i) => (
+          <div key={i} style={{ color: "#ffd166" }}>
+            {c}
+          </div>
+        ))}
       </div>
       <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
         {HELP.map((h) => (
