@@ -48,17 +48,17 @@ export function Highlight({
   );
 }
 
-/** Text that always faces the camera and shows through walls. */
+/** Text that always faces the camera, at a fixed size on screen, and shows through walls. */
 export function Label({
   text,
   position,
   colour = HIGHLIGHT,
-  size = 0.6,
+  size = 0.035,
 }: {
   text: string;
   position: [number, number, number];
   colour?: string;
-  /** Text height, in metres. */
+  /** Label height, as a fraction of the view's height. */
   size?: number;
 }) {
   const texture = useMemo(() => labelTexture(text, colour), [text, colour]);
@@ -66,7 +66,7 @@ export function Label({
   const { width, height } = texture.image as HTMLCanvasElement;
   return (
     <sprite position={position} scale={[(size * width) / height, size, 1]} renderOrder={2}>
-      <spriteMaterial map={texture} depthTest={false} transparent />
+      <spriteMaterial map={texture} depthTest={false} transparent sizeAttenuation={false} />
     </sprite>
   );
 }

@@ -23,6 +23,7 @@ import {
   useExplainer,
   type ExplainStore,
 } from "./explainStore.ts";
+import { Markings } from "./markings.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
@@ -61,6 +62,7 @@ interface Hud {
   readonly calls: readonly string[];
   readonly event: string | null;
   readonly assist: boolean;
+  readonly markings: boolean;
 }
 
 /** Steps the game at a fixed rate, and draws the ball between steps. */
@@ -130,7 +132,7 @@ const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
-  "X: explanations on/off",
+  "M: court markings · X: explanations on/off",
 ];
 
 /** Solo practice: move, hit, and serve, with no opponent. */
@@ -145,6 +147,7 @@ export function Practice() {
     calls: [],
     event: null,
     assist: true,
+    markings: false,
   }));
   const onHud = (h: HudChange) =>
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
@@ -161,6 +164,7 @@ export function Practice() {
       };
       if (e.code === "KeyH") setHud((h) => ({ ...h, assist: !h.assist }));
       if (e.code === "KeyX") explain.set(toggle(explain.get()));
+      if (e.code === "KeyM") setHud((h) => ({ ...h, markings: !h.markings }));
       // No feeds while the Marker explains.
       if (explain.get().showing) return;
       const run = command[e.code];
@@ -186,6 +190,7 @@ export function Practice() {
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
         <Loop store={store} explain={explain} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
+        {hud.markings && <Markings />}
         <AssistRings view={() => store.get()} on={hud.assist} />
         <FollowCamera
           target={() => {

@@ -11,6 +11,8 @@ import { keyboard } from "../input/keyboard.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
 import { callScore, type Labels } from "../rules/score.ts";
+import type { ChaseCall } from "../court/chase.ts";
+import type { MatchState } from "../rules/match.ts";
 import { createWorld, STEP } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
 import { dismiss, toggle } from "../teach/explain.ts";
@@ -21,6 +23,7 @@ import {
   useExplainer,
   type ExplainStore,
 } from "./explainStore.ts";
+import { ChaseMarkers, Markings } from "./markings.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { Player } from "./Player.tsx";
@@ -67,7 +70,11 @@ interface Hud {
   readonly calls: readonly string[];
   readonly event: string | null;
   readonly assist: boolean;
+  readonly markings: boolean;
   readonly over: boolean;
+  /** Chases laid, or being played off. */
+  readonly chases: readonly ChaseCall[];
+  readonly playingOff: boolean;
 }
 
 type HudChange = Partial<Hud> | ((old: Hud) => Partial<Hud>);
@@ -76,6 +83,12 @@ const human = (store: Store): Athlete => athleteOf(store.get().play, PLAYER_ID);
 
 function choice(a: Athlete): string {
   return a.serve !== null ? `Serve: ${SERVE_STYLES[a.serveStyle]!.name}` : `Shot: ${a.shot}`;
+}
+
+function chasesOf(m: MatchState): Pick<Hud, "chases" | "playingOff"> {
+  return m.playOff.length > 0
+    ? { chases: m.playOff, playingOff: true }
+    : { chases: m.chases, playingOff: false };
 }
 
 /** Games and sets so far, e.g. "Games 2–1 · Sets 0–0" (the player first). */
@@ -150,6 +163,7 @@ function Loop({
         onHud({
           score: `${callScore(r.state.match, LABELS)} · ${tally(r.state)}`,
           over: r.state.phase === "over",
+          ...chasesOf(r.state.match),
         });
     }
     const a = l.prev;
@@ -169,7 +183,7 @@ function Loop({
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
-  "H: hit assist · X: explanations on/off · Esc: leave the match",
+  "H: hit assist · M: court markings · X: explanations on/off · Esc: leave the match",
 ];
 
 function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
@@ -196,7 +210,9 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),
     event: null,
     assist: true,
+    markings: false,
     over: false,
+    ...chasesOf(start.state.match),
   }));
   const onHud = (h: HudChange) =>
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
@@ -205,6 +221,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     const down = (e: KeyboardEvent) => {
       if (e.code === "KeyH" && !e.repeat) setHud((h) => ({ ...h, assist: !h.assist }));
       if (e.code === "KeyX" && !e.repeat) explain.set(toggle(explain.get()));
+      if (e.code === "KeyM" && !e.repeat) setHud((h) => ({ ...h, markings: !h.markings }));
       if (e.code === "Escape") onQuit();
     };
     window.addEventListener("keydown", down);
@@ -231,6 +248,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         />
         <Loop game={game} level={setup.level} explain={explain} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
+        {hud.markings && <Markings />}
+        <ChaseMarkers chases={hud.chases} />
         <AssistRings
           view={() => ({
             sim: game.get().play.sim,
@@ -254,6 +273,12 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
       </Canvas>
       <div style={{ ...panel, left: 12, top: 12 }}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{hud.score}</div>
+        {hud.chases.length > 0 && (
+          <div style={{ color: "#f28482" }}>
+            {hud.playingOff ? "Playing for: " : "Chases: "}
+            {hud.chases.map((c) => c.name).join(" · ")}
+          </div>
+        )}
         <div>{hud.choice}</div>
         {hud.last && <div>{hud.last}</div>}
         {hud.event && <div style={{ color: "#4cc9f0" }}>{hud.event}</div>}

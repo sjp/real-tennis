@@ -1,6 +1,6 @@
 import { faultLineX, serviceLineZ } from "./classify.ts";
 import { collisionGeometry, type SurfaceId } from "./collision.ts";
-import type { CourtDefinition, OpeningId, Vec3 } from "./types.ts";
+import type { ChaseMark, CourtDefinition, OpeningId, Side, Vec3 } from "./types.ts";
 
 /** A part of the court that teaching can highlight and label (070). */
 export type CourtFeature =
@@ -130,8 +130,7 @@ function featurePolygons(court: CourtDefinition, f: CourtFeature): FeatureShape[
     normal: UP,
   });
   const across = (z: number) => rect(-hw, hw, z - w / 2, z + w / 2);
-  const chaseZ = (side: "service" | "hazard", d: number) =>
-    side === "service" ? -hl + d : lineZ - d;
+  const chaseZ = (side: Side, distance: number) => markZ(court, { side, distance });
 
   switch (f) {
     case "net": {
@@ -206,4 +205,11 @@ function openingSensors(court: CourtDefinition, ids: readonly OpeningId[]) {
       ? [{ vertices: p.vertices, normal: p.normal }]
       : [],
   );
+}
+
+/** z of a chase mark, or of a chase line at that distance. */
+export function markZ(court: CourtDefinition, mark: ChaseMark): number {
+  return mark.side === "service"
+    ? -court.floor.length / 2 + mark.distance
+    : serviceLineZ(court) - mark.distance;
 }
