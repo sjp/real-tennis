@@ -25,7 +25,10 @@ import { PauseMenu } from "./pause.tsx";
 import { loadDone, saveDone } from "./progress.ts";
 import { usePlayUi } from "./playUi.ts";
 import { useSettings } from "./settings.ts";
-import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
+import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
+import { hear } from "../audio/engine.ts";
+import { PLAYER_ID } from "../game/practice.ts";
+import { length } from "../sim/vec.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { cameraStart, describeNotice, HIGHLIGHT, panel } from "./view.ts";
 
@@ -93,6 +96,9 @@ function Loop({
       const before = store.get();
       l.prev = simOf(before).ball.position;
       const r = lessonStep(world, before, input, Math.random);
+      hear(r.events, length(simOf(before).ball.velocity), (p) =>
+        p === PLAYER_ID ? learner(before).shot : undefined,
+      );
       store.set(r.state);
       input = { ...input, swing: false, select: null };
       l.acc -= STEP;
@@ -207,6 +213,7 @@ function LessonGame({
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
+        <Ears />
         <ServeLine visible={() => learner(store.get()).serve !== null} />
         <Player view={() => ({ athlete: learner(store.get()), time: simOf(store.get()).time })} />
         {isMatch && (

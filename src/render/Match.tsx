@@ -30,7 +30,9 @@ import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { Player } from "./Player.tsx";
-import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
+import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
+import { hear } from "../audio/engine.ts";
+import { length } from "../sim/vec.ts";
 import { cameraStart, describeEvent, describeNotice, HIGHLIGHT, panel } from "./view.ts";
 
 const world = createWorld(court);
@@ -141,6 +143,7 @@ function Loop({
       const ai = aiInput(world, view, AI_PRESETS[level], memory, Math.random, capsule);
       const r = playStep(world, before, { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input });
       game.set({ play: r.state, memory: ai.memory });
+      hear(r.events, length(before.sim.ball.velocity), (p) => athleteOf(before, p).shot);
       input = { ...input, swing: false, select: null };
       l.acc -= STEP;
 
@@ -225,6 +228,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
+        <Ears />
         <ServeLine visible={() => human(game).serve !== null} />
         <Player view={() => ({ athlete: human(game), time: game.get().play.sim.time })} />
         <Player

@@ -8,6 +8,7 @@ import { assist, type Assist } from "../game/assist.ts";
 import type { Motion } from "../player/movement.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
 import { createWorld, predict, type Prediction, type SimState } from "../sim/world.ts";
+import { ear } from "../audio/engine.ts";
 
 const world = createWorld(court);
 const hw = court.floor.width / 2;
@@ -88,6 +89,20 @@ export function FollowCamera({
       .addScaledVector(ahead, 1 - w * 1.75);
     look.current.lerp(aim, k);
     camera.lookAt(look.current);
+  });
+  return null;
+}
+
+/** Hears from the camera: keeps the audio's listener where the camera is. */
+export function Ears() {
+  const camera = useThree((s) => s.camera);
+  useFrame(() => {
+    const right = new Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const p = camera.position;
+    ear.current = {
+      position: { x: p.x, y: p.y, z: p.z },
+      right: { x: right.x, y: right.y, z: right.z },
+    };
   });
   return null;
 }

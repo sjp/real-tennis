@@ -4,6 +4,7 @@ import type { PlayUi } from "./playUi.ts";
 import { Rules } from "./Rules.tsx";
 import { settings, useSettings } from "./settings.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
+import { Volume } from "./Volume.tsx";
 
 const canFullscreen = () => typeof document !== "undefined" && document.fullscreenEnabled;
 
@@ -72,6 +73,7 @@ export function PauseMenu({
           <button style={button} onClick={() => settings.set({ assist: !s.assist })}>
             Hit assist: {onOff(s.assist)} (H)
           </button>
+          <Volume />
           {canFullscreen() && (
             <button style={button} onClick={toggleFullscreen}>
               Fullscreen

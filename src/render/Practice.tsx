@@ -28,7 +28,9 @@ import { PauseMenu } from "./pause.tsx";
 import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
-import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
+import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
+import { hear } from "../audio/engine.ts";
+import { length } from "../sim/vec.ts";
 import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
 import { Player } from "./Player.tsx";
 import { useSettings } from "./settings.ts";
@@ -100,6 +102,7 @@ function Loop({
       const before = store.get();
       l.prev = before.sim.ball.position;
       const r = practiceStep(world, before, input);
+      hear(r.events, length(before.sim.ball.velocity), () => before.shot);
       store.set(r.state);
       input = { ...input, swing: false, select: null };
       l.acc -= STEP;
@@ -189,6 +192,7 @@ export function Practice() {
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
         <directionalLight position={[-6, 8, 10]} intensity={0.6} />
         <Court court={court} />
+        <Ears />
         <ServeLine visible={() => store.get().serve !== null} />
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
         <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
