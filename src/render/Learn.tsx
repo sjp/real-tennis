@@ -21,8 +21,9 @@ import {
 } from "./explainStore.ts";
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { Player } from "./Player.tsx";
-import { Rules } from "./Rules.tsx";
-import { settings, useSettings } from "./settings.ts";
+import { PauseMenu } from "./pause.tsx";
+import { usePlayUi } from "./playUi.ts";
+import { useSettings } from "./settings.ts";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { cameraStart, describeNotice, HIGHLIGHT, panel } from "./view.ts";
@@ -146,7 +147,7 @@ function Loop({
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
-  "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: lessons",
+  "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: pause",
 ];
 
 function LessonGame({
@@ -172,10 +173,9 @@ function LessonGame({
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
   const [intro, setIntro] = useState(true);
-  const [rules, setRules] = useState(false);
-  const [markings, setMarkings] = useState(false);
-  const held = useRef({ intro: true, rules: false });
-  const isPaused = () => held.current.intro || held.current.rules || explain.get().showing !== null;
+  const ui = usePlayUi(explain);
+  const held = useRef({ intro: true });
+  const isPaused = () => held.current.intro || ui.held() || explain.get().showing !== null;
   const [hud, setHud] = useState<Hud>(() => ({
     progress: 0,
     done: false,
@@ -194,28 +194,16 @@ function LessonGame({
       held.current.intro = false;
       setIntro(false);
     };
-    const showRules = (open: boolean) => {
-      held.current.rules = open;
-      setRules(open);
-    };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
       if (held.current.intro && (e.code === "Space" || e.code === "Enter")) {
         e.preventDefault();
         begin();
       }
-      if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
-      if (e.code === "KeyM") setMarkings((m) => !m);
-      if (e.code === "KeyX") explain.set(toggle(explain.get()));
-      if (e.code === "Slash") showRules(!held.current.rules);
-      if (e.code === "Escape") {
-        if (held.current.rules) showRules(false);
-        else onQuit();
-      }
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [explain, onQuit]);
+  }, []);
 
   const s = store.get();
   const me = learner(s);
@@ -252,7 +240,7 @@ function LessonGame({
         )}
         <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
-        {markings && <Markings />}
+        {ui.markings && <Markings />}
         <ChaseMarkers chases={chases} />
         <AssistRings
           view={() => {
@@ -332,14 +320,7 @@ function LessonGame({
           </div>
         </Centred>
       )}
-      {rules && (
-        <Rules
-          onClose={() => {
-            held.current.rules = false;
-            setRules(false);
-          }}
-        />
-      )}
+      <PauseMenu ui={ui} explain={explain} leave="Back to the lessons" onLeave={onQuit} />
       {ex.showing && !intro && (
         <ExplainPanel
           id={ex.showing}

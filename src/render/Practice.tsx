@@ -24,13 +24,14 @@ import {
   type ExplainStore,
 } from "./explainStore.ts";
 import { Markings } from "./markings.tsx";
-import { Rules } from "./Rules.tsx";
+import { PauseMenu } from "./pause.tsx";
+import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
 import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
 import { Player } from "./Player.tsx";
-import { settings, useSettings } from "./settings.ts";
+import { useSettings } from "./settings.ts";
 
 const world = createWorld(court);
 
@@ -63,7 +64,6 @@ interface Hud {
   /** The Marker's calls for the current rest. */
   readonly calls: readonly string[];
   readonly event: string | null;
-  readonly markings: boolean;
 }
 
 /** Steps the game at a fixed rate, and draws the ball between steps. */
@@ -136,7 +136,7 @@ const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
-  "M: court markings · X: explanations on/off · ?: rules · Esc: menu",
+  "M: court markings · X: explanations on/off · ?: rules · Esc: pause",
 ];
 
 /** Solo practice: move, hit, and serve, with no opponent. */
@@ -144,20 +144,15 @@ export function Practice() {
   const [store] = useState(createStore);
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
-  const [rules, setRules] = useState(false);
-  const rulesOpen = useRef(false);
-  const showRules = (open: boolean) => {
-    rulesOpen.current = open;
-    setRules(open);
-  };
-  const isPaused = () => rulesOpen.current || explain.get().showing !== null;
+  const ui = usePlayUi(explain);
+  const held = ui.held;
+  const isPaused = () => ui.held() || explain.get().showing !== null;
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
     choice: choice(store.get()),
     last: null,
     calls: [],
     event: null,
-    markings: false,
   }));
   const onHud = (h: HudChange) =>
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
@@ -172,17 +167,8 @@ export function Practice() {
         KeyE: () => changeEnds(court, s),
         KeyQ: () => startServe(court, s),
       };
-      if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
-      if (e.code === "KeyX") explain.set(toggle(explain.get()));
-      if (e.code === "KeyM") setHud((h) => ({ ...h, markings: !h.markings }));
-      if (e.code === "Slash") showRules(!rulesOpen.current);
-      if (e.code === "Escape") {
-        if (!rulesOpen.current) location.assign(location.pathname);
-        showRules(false);
-      }
-      if (rulesOpen.current) return;
-      // No feeds while the Marker explains.
-      if (explain.get().showing) return;
+      // No feeds while paused, or while the Marker explains.
+      if (held() || explain.get().showing) return;
       const run = command[e.code];
       if (!run) return;
       store.set(run());
@@ -190,7 +176,7 @@ export function Practice() {
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [store, explain]);
+  }, [store, explain, held]);
 
   const s = store.get();
   const { assist } = useSettings();
@@ -207,7 +193,7 @@ export function Practice() {
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
         <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
-        {hud.markings && <Markings />}
+        {ui.markings && <Markings />}
         <AssistRings view={() => store.get()} on={assist} />
         <FollowCamera
           target={() => {
@@ -239,7 +225,12 @@ export function Practice() {
           Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
         </div>
       </div>
-      {rules && <Rules onClose={() => showRules(false)} />}
+      <PauseMenu
+        ui={ui}
+        explain={explain}
+        leave="Back to the menu"
+        onLeave={() => location.assign(location.pathname)}
+      />
       {ex.showing && (
         <ExplainPanel
           id={ex.showing}
