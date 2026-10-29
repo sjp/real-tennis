@@ -59,6 +59,8 @@ export interface Swinging {
   /** Set at contact: which side, and how it went. */
   readonly backhand: boolean;
   readonly contact: boolean;
+  /** Swung at a tossed ball: a serve. */
+  readonly serve: boolean;
 }
 
 export interface PracticeState {
@@ -223,7 +225,13 @@ export function practiceStep(
   } else if (input.swing && s.swing === null) {
     s = {
       ...s,
-      swing: { start: s.sim.time, path: swingPath(world, s.sim), backhand: false, contact: false },
+      swing: {
+        start: s.sim.time,
+        path: swingPath(world, s.sim),
+        backhand: false,
+        contact: false,
+        serve: s.serve === "tossed",
+      },
     };
   }
 

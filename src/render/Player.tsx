@@ -1,16 +1,14 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { ExtrudeGeometry, Shape, type Group } from "three";
+import { ExtrudeGeometry, Shape, Vector3, type Group } from "three";
 import { timeSwing, FOLLOW_THROUGH } from "../game/practice.ts";
 import { standardPlayer } from "../player/movement.ts";
+import { SERVE_STYLES } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";
+import { ARM, groundstrokeArm, HANDLE_LENGTH, HEAD_LENGTH, serveArm } from "./serveArm.ts";
 import type { Store } from "./Practice.tsx";
 
 const DEG = Math.PI / 180;
-// Law 4: at most 680 mm overall.
-const RACKET_LENGTH = 0.68;
-const HEAD_LENGTH = 0.25;
-const HANDLE_LENGTH = RACKET_LENGTH - HEAD_LENGTH;
 
 /**
  * The lopsided real tennis racket head, in its own plane: y along the
@@ -48,6 +46,8 @@ const SHOES = "#2b2b2b";
 const HAIR = "#4a3222";
 
 const HIP = 0.92;
+/** The racket arm's pivot height. */
+const SHOULDER_Y = standardPlayer.height - 0.38;
 const LEG = HIP - 0.06;
 const SHOULDER_WIDTH = 0.21;
 /** Stride angle at full running speed, and steps per metre. */
@@ -80,11 +80,12 @@ export function Player({ store }: { store: Store }) {
   const body = useRef<Group>(null);
   const arm = useRef<Group>(null);
   const free = useRef<Group>(null);
+  const wrist = useRef<Group>(null);
   const legs = useRef<(Group | null)[]>([]);
   const stride = useRef({ phase: 0, last: 0 });
   const head = useMemo(() => headGeometry(), []);
   const { height, runSpeed } = standardPlayer;
-  const shoulder = height - 0.35;
+  const shoulder = SHOULDER_Y + 0.03;
 
   useFrame(() => {
     const s = store.get();
@@ -100,7 +101,18 @@ export function Player({ store }: { store: Store }) {
     // Facing +z the right is -x. The arm points along its local +x; turn it
     // so 0° is straight out to the side and positive angles come forwards.
     arm.current.position.x = backhand ? SHOULDER_WIDTH : -SHOULDER_WIDTH;
-    arm.current.rotation.y = backhand ? -angle * DEG : Math.PI + angle * DEG;
+    if (s.swing?.serve) {
+      const style = SERVE_STYLES[s.serveStyle]!;
+      const pivot = new Vector3(-SHOULDER_WIDTH, SHOULDER_Y, 0);
+      const idle = groundstrokeArm(-20, false);
+      const t = s.sim.time - s.swing.start;
+      const pose = serveArm(t, style.overarm, style.contactHeight, pivot, idle);
+      arm.current.quaternion.copy(pose.arm);
+      wrist.current?.rotation.set(0, 0, pose.wrist);
+    } else {
+      arm.current.quaternion.copy(groundstrokeArm(angle, backhand));
+      wrist.current?.rotation.set(0, 0, ARM.wrist);
+    }
 
     // Legs and the free arm swing with the distance run.
     const st = stride.current;
@@ -167,8 +179,8 @@ export function Player({ store }: { store: Store }) {
         </group>
       </group>
       {/* Racket arm: the shoulder pivot; the arm points along +x before rotating. */}
-      <group ref={arm} position={[-SHOULDER_WIDTH, shoulder - 0.03, 0]}>
-        <group rotation={[0, 0, -40 * DEG]}>
+      <group ref={arm} position={[-SHOULDER_WIDTH, SHOULDER_Y, 0]}>
+        <group rotation={[0, 0, ARM.tilt]}>
           <mesh position={[0.13, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.042, 0.05, 0.26, 8]} />
             <meshStandardMaterial color={SHIRT} flatShading />
@@ -178,7 +190,7 @@ export function Player({ store }: { store: Store }) {
             <meshStandardMaterial color={SKIN} flatShading />
           </mesh>
           {/* The racket, from the hand outwards. */}
-          <group position={[0.5, 0, 0]} rotation={[0, 0, 30 * DEG]}>
+          <group ref={wrist} position={[ARM.length, 0, 0]} rotation={[0, 0, ARM.wrist]}>
             <mesh position={[HANDLE_LENGTH / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
               <cylinderGeometry args={[0.014, 0.016, HANDLE_LENGTH, 6]} />
               <meshStandardMaterial color="#7a5230" />
