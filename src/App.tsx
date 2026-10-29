@@ -1,3 +1,10 @@
+import { Canvas } from "@react-three/fiber";
+import { PlaceholderScene } from "./render/PlaceholderScene.tsx";
+
 export default function App() {
-  return <h1>Real Tennis</h1>;
+  return (
+    <Canvas camera={{ position: [8, 6, 8], fov: 50 }}>
+      <PlaceholderScene />
+    </Canvas>
+  );
 }
