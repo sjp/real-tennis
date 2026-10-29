@@ -2,7 +2,10 @@ import type { InputState } from "../input/input.ts";
 import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts";
 import { playerCapsule } from "../game/player.ts";
 import type { MatchConfig } from "../rules/match.ts";
-import type { PlayerId, RallyOutcome } from "../rules/rally.ts";
+import type { PlayerId } from "../rules/rally.ts";
+import { decided, strokesIn, type Rest } from "../game/summary.ts";
+
+export type { Rest };
 import type { World } from "../sim/world.ts";
 import { aiInput, FRESH, type AiMemory } from "./ai.ts";
 import type { AiPreset } from "./presets.ts";
@@ -22,13 +25,6 @@ export function viewOf(s: PlayState, id: PlayerId) {
     live: s.phase === "play",
     since: s.since,
   };
-}
-
-export interface Rest {
-  readonly server: PlayerId;
-  readonly outcome: RallyOutcome;
-  /** Racket hits, the service included. */
-  readonly strokes: number;
 }
 
 /**
@@ -69,12 +65,13 @@ export function playAi(
       inputs[id] = r.input;
       memory[id] = r.memory;
     }
-    const before = s.phase;
+    const before = s;
     const r = playStep(world, s, inputs);
     s = r.state;
-    if (before === "play") strokes += r.events.filter((e) => e.type === "racketHit").length;
-    if (before === "play" && s.phase === "called") {
-      rests.push({ server: s.match.server, outcome: s.rally.outcome!, strokes });
+    strokes += strokesIn(before, r.events);
+    const rest = decided(before, s, strokes);
+    if (rest) {
+      rests.push(rest);
       strokes = 0;
     }
   }

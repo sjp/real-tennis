@@ -29,6 +29,8 @@ import {
 } from "./explainStore.ts";
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
+import { Summary } from "./Summary.tsx";
+import { decided, strokesIn, type Rest } from "../game/summary.ts";
 import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
@@ -57,6 +59,10 @@ const OPPONENT_SHIRT = "#b5443c";
 interface Game {
   readonly play: PlayState;
   readonly memory: AiMemory;
+  /** Decided rests, for the summary. */
+  readonly rests: readonly Rest[];
+  /** Strokes in the rest in play. */
+  readonly strokes: number;
 }
 
 /** The match, owned outside React and stepped every frame. */
@@ -146,7 +152,7 @@ function Loop({
     }
     l.acc += Math.min(delta, 0.1);
     while (l.acc >= STEP && !isPaused()) {
-      const { play: before, memory } = game.get();
+      const { play: before, memory, rests, strokes: struck } = game.get();
       l.prev = before.sim.ball.position;
       const view = {
         me: athleteOf(before, OPPONENT_ID),
@@ -158,7 +164,14 @@ function Loop({
       const capsule = playerCapsule(view.me);
       const ai = aiInput(world, view, AI_PRESETS[level], memory, Math.random, capsule);
       const r = playStep(world, before, { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input });
-      game.set({ play: r.state, memory: ai.memory });
+      const strokes = struck + strokesIn(before, r.events);
+      const rest = decided(before, r.state, strokes);
+      game.set({
+        play: r.state,
+        memory: ai.memory,
+        rests: rest ? [...rests, rest] : rests,
+        strokes: rest ? 0 : strokes,
+      });
       hear(r.events, length(before.sim.ball.velocity), (p) => athleteOf(before, p).shot);
       input = { ...input, swing: false, select: null };
       l.acc -= STEP;
@@ -212,7 +225,9 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     };
     return startPlay(world, config, Math.random, LABELS);
   });
-  const [game] = useState(() => createStore({ play: start.state, memory: FRESH }));
+  const [game] = useState(() =>
+    createStore({ play: start.state, memory: FRESH, rests: [], strokes: 0 }),
+  );
   const [explain] = useState(() => {
     const store = createExplainStore();
     explainCalls(store, start.calls, true);
@@ -316,10 +331,13 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
       )}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
       {hud.over && (
-        <div style={centred}>
-          <div style={{ fontSize: 18, marginBottom: 8 }}>{hud.score}</div>
-          <button onClick={onQuit}>New match</button>
-        </div>
+        <Summary
+          match={game.get().play.match}
+          rests={game.get().rests}
+          you={PLAYER_ID}
+          them={OPPONENT_ID}
+          onNew={onQuit}
+        />
       )}
       {touchShown ? (
         !ui.menu &&
