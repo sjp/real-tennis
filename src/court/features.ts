@@ -45,7 +45,7 @@ const FEATURE_NAMES: Readonly<Record<string, string>> = {
   sidePenthouse: "Side Penthouse",
   servicePenthouse: "Service Penthouse",
   grillePenthouse: "Grille Penthouse",
-  grilleEnd: "High Back Wall",
+  grilleEnd: "Grille Penthouse and High Back Wall",
   outOfCourt: "Out of court",
   serviceLine: "Service Line",
   faultLine: "Fault Line",
@@ -94,8 +94,18 @@ const NON_WINNING: readonly OpeningId[] = [
   "hazardSecondGallery",
 ];
 
+const shapes = new WeakMap<CourtDefinition, Map<CourtFeature, FeatureShape>>();
+
 /** The polygons that show `f`, and where to label it. */
 export function featureShape(court: CourtDefinition, f: CourtFeature): FeatureShape {
+  let cache = shapes.get(court);
+  if (!cache) shapes.set(court, (cache = new Map()));
+  let shape = cache.get(f);
+  if (!shape) cache.set(f, (shape = buildShape(court, f)));
+  return shape;
+}
+
+function buildShape(court: CourtDefinition, f: CourtFeature): FeatureShape {
   const polygons = featurePolygons(court, f);
   const all = polygons.flatMap((p) => p.vertices);
   const mean = (k: "x" | "y" | "z") => all.reduce((s, v) => s + v[k], 0) / all.length;

@@ -12,6 +12,16 @@ import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
 import { callScore, type Labels } from "../rules/score.ts";
 import { createWorld, STEP } from "../sim/world.ts";
+import { EXPLANATIONS } from "../teach/content.ts";
+import { dismiss, toggle } from "../teach/explain.ts";
+import {
+  createExplainStore,
+  explainCalls,
+  focusOf,
+  useExplainer,
+  type ExplainStore,
+} from "./explainStore.ts";
+import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { Player } from "./Player.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
@@ -81,23 +91,32 @@ function tally(p: PlayState): string {
 function Loop({
   game,
   level,
+  explain,
   onHud,
 }: {
   game: Store;
   level: AiLevel;
+  explain: ExplainStore;
   onHud: (h: HudChange) => void;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ prev: game.get().play.sim.ball.position, acc: 0 });
+  const loop = useRef({ prev: game.get().play.sim.ball.position, acc: 0, paused: false });
 
   useEffect(() => () => keys.dispose(), [keys]);
 
   useFrame((_, delta) => {
     const l = loop.current;
     let input = keys.read();
+    // Frozen while the Marker explains; the key that resumes isn't a swing.
+    const paused = explain.get().showing !== null;
+    if (paused || l.paused) {
+      l.paused = paused;
+      l.acc = 0;
+      return;
+    }
     l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP) {
+    while (l.acc >= STEP && explain.get().showing === null) {
       const { play: before, memory } = game.get();
       l.prev = before.sim.ball.position;
       const view = {
@@ -122,6 +141,7 @@ function Loop({
         const text = describeEvent(e);
         if (text) onHud({ event: text });
       }
+      explainCalls(explain, r.calls, r.state.phase !== "play" || r.state.rally.striker === null);
       if (r.calls.length > 0)
         onHud((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-4),
@@ -149,7 +169,7 @@ function Loop({
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
-  "H: hit assist · Esc: leave the match",
+  "H: hit assist · X: explanations on/off · Esc: leave the match",
 ];
 
 function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
@@ -162,6 +182,13 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     return startPlay(world, config, Math.random, LABELS);
   });
   const [game] = useState(() => createStore({ play: start.state, memory: FRESH }));
+  const [explain] = useState(() => {
+    const store = createExplainStore();
+    explainCalls(store, start.calls, true);
+    return store;
+  });
+  const ex = useExplainer(explain);
+  const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
     score: `${callScore(start.state.match, LABELS)} · ${tally(start.state)}`,
     choice: choice(human(game)),
@@ -177,11 +204,12 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "KeyH" && !e.repeat) setHud((h) => ({ ...h, assist: !h.assist }));
+      if (e.code === "KeyX" && !e.repeat) explain.set(toggle(explain.get()));
       if (e.code === "Escape") onQuit();
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [onQuit]);
+  }, [onQuit, explain]);
 
   const me = human(game);
   return (
@@ -201,7 +229,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           })}
           shirt={OPPONENT_SHIRT}
         />
-        <Loop game={game} level={setup.level} onHud={onHud} />
+        <Loop game={game} level={setup.level} explain={explain} onHud={onHud} />
+        {feature && <Highlight feature={feature} />}
         <AssistRings
           view={() => ({
             sim: game.get().play.sim,
@@ -218,6 +247,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
               at: me.motion.position,
               end: me.end,
               ball: sim.live ? sim.ball.position : null,
+              focus: focusOf(explain),
             };
           }}
         />
@@ -233,6 +263,13 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           </div>
         ))}
       </div>
+      {ex.showing && (
+        <ExplainPanel
+          id={ex.showing}
+          onClose={() => explain.set(dismiss(explain.get()))}
+          onOff={() => explain.set(toggle(explain.get()))}
+        />
+      )}
       {hud.over && (
         <div style={{ ...panel, left: "50%", top: "40%", transform: "translate(-50%, -50%)" }}>
           <div style={{ fontSize: 18, marginBottom: 8 }}>{hud.score}</div>
@@ -244,7 +281,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           <div key={h}>{h}</div>
         ))}
         <div>
-          Opponent: {setup.level} · Hit assist: {hud.assist ? "on" : "off"}
+          Opponent: {setup.level} · Hit assist: {hud.assist ? "on" : "off"} · Explanations:{" "}
+          {ex.on ? "on" : "off"}
         </div>
       </div>
     </>

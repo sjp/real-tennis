@@ -11,6 +11,7 @@ import { createWorld, predict, type Prediction, type SimState } from "../sim/wor
 
 const world = createWorld(court);
 const hw = court.floor.width / 2;
+const hl = court.floor.length / 2;
 
 const LOOK_AHEAD = 8;
 /** Seconds for the camera to settle; about 1 s to swing round on a change of ends. */
@@ -40,18 +41,28 @@ function cameraHeight(z: number): number {
  * past the receiver stays in view. Near the end wall the camera drops below
  * the penthouse and may sit behind the wall, which is drawn one-sided and so
  * seen through, like the view from the dedans. Swings round on a change of
- * ends.
+ * ends. Given a `focus`, it leaves the player to look at that from mid-court.
  */
 export function FollowCamera({
   target,
 }: {
-  target: () => { at: FloorPoint; end: Side; ball: Vec3 | null };
+  target: () => { at: FloorPoint; end: Side; ball: Vec3 | null; focus?: Vec3 | null };
 }) {
   const camera = useThree((s) => s.camera);
   const look = useRef(new Vector3(0, 1, 0));
   const yaw = useRef<number | null>(null);
   useFrame((_, delta) => {
-    const { at, end, ball } = target();
+    const { at, end, ball, focus } = target();
+    const k = Math.min(1, delta / FOLLOW);
+    if (focus) {
+      const away = focus.z > 0 ? -1 : 1;
+      const from = new Vector3(focus.x * 0.3, 7, focus.z + away * 10);
+      from.z = Math.max(-hl, Math.min(hl, from.z));
+      camera.position.lerp(from, k / 3);
+      look.current.lerp(new Vector3(focus.x, focus.y, focus.z), k / 3);
+      camera.lookAt(look.current);
+      return;
+    }
     const want = end === "service" ? 0 : Math.PI;
     yaw.current ??= want;
     let turn = want - yaw.current;
@@ -63,7 +74,6 @@ export function FollowCamera({
     const w = ball ? WATCH : 0;
     const bx = ball?.x ?? x;
     const cx = x - fx * BEHIND - SHIFT * w * (bx - x);
-    const k = Math.min(1, delta / FOLLOW);
     const cz = z - fz * BEHIND;
     camera.position.lerp(
       new Vector3(Math.max(-hw + 0.3, Math.min(hw - 0.3, cx)), cameraHeight(cz), cz),

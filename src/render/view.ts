@@ -14,6 +14,9 @@ export function cameraStart(at: FloorPoint, end: Side): [number, number, number]
   return [at.x, ABOVE, at.z - f * BEHIND];
 }
 
+/** Teaching highlights. */
+export const HIGHLIGHT = "#4cc9f0";
+
 /** The HUD's panels. */
 export const panel = {
   position: "absolute",

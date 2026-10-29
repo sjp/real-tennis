@@ -14,6 +14,16 @@ import {
 import { keyboard } from "../input/keyboard.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { createWorld, STEP } from "../sim/world.ts";
+import { EXPLANATIONS } from "../teach/content.ts";
+import { dismiss, toggle } from "../teach/explain.ts";
+import {
+  createExplainStore,
+  explainCalls,
+  focusOf,
+  useExplainer,
+  type ExplainStore,
+} from "./explainStore.ts";
+import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
 import { cameraStart, describeEvent, describeNotice, panel } from "./view.ts";
@@ -54,18 +64,33 @@ interface Hud {
 }
 
 /** Steps the game at a fixed rate, and draws the ball between steps. */
-function Loop({ store, onHud }: { store: Store; onHud: (h: HudChange) => void }) {
+function Loop({
+  store,
+  explain,
+  onHud,
+}: {
+  store: Store;
+  explain: ExplainStore;
+  onHud: (h: HudChange) => void;
+}) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ prev: store.get().sim.ball.position, acc: 0 });
+  const loop = useRef({ prev: store.get().sim.ball.position, acc: 0, paused: false });
 
   useEffect(() => () => keys.dispose(), [keys]);
 
   useFrame((_, delta) => {
     const l = loop.current;
     let input = keys.read();
+    // Frozen while the Marker explains; the key that resumes isn't a swing.
+    const paused = explain.get().showing !== null;
+    if (paused || l.paused) {
+      l.paused = paused;
+      l.acc = 0;
+      return;
+    }
     l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP) {
+    while (l.acc >= STEP && explain.get().showing === null) {
       const before = store.get();
       l.prev = before.sim.ball.position;
       const r = practiceStep(world, before, input);
@@ -75,6 +100,8 @@ function Loop({ store, onHud }: { store: Store; onHud: (h: HudChange) => void })
       if (before.shot !== r.state.shot || before.serveStyle !== r.state.serveStyle)
         onHud({ choice: choice(r.state) });
       for (const n of r.notices) onHud(describeNotice(n));
+      const rally = r.state.rally;
+      explainCalls(explain, r.calls, !rally || rally.outcome !== null || rally.striker === null);
       if (r.calls.length > 0)
         onHud((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-3),
@@ -103,11 +130,15 @@ const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
+  "X: explanations on/off",
 ];
 
 /** Solo practice: move, hit, and serve, with no opponent. */
 export function Practice() {
   const [store] = useState(createStore);
+  const [explain] = useState(createExplainStore);
+  const ex = useExplainer(explain);
+  const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
     choice: choice(store.get()),
     last: null,
@@ -129,6 +160,9 @@ export function Practice() {
         KeyQ: () => startServe(court, s),
       };
       if (e.code === "KeyH") setHud((h) => ({ ...h, assist: !h.assist }));
+      if (e.code === "KeyX") explain.set(toggle(explain.get()));
+      // No feeds while the Marker explains.
+      if (explain.get().showing) return;
       const run = command[e.code];
       if (!run) return;
       store.set(run());
@@ -136,7 +170,7 @@ export function Practice() {
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [store]);
+  }, [store, explain]);
 
   const s = store.get();
 
@@ -150,7 +184,8 @@ export function Practice() {
         <Court court={court} />
         <ServeLine visible={() => store.get().serve !== null} />
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
-        <Loop store={store} onHud={onHud} />
+        <Loop store={store} explain={explain} onHud={onHud} />
+        {feature && <Highlight feature={feature} />}
         <AssistRings view={() => store.get()} on={hud.assist} />
         <FollowCamera
           target={() => {
@@ -159,6 +194,7 @@ export function Practice() {
               at: s.motion.position,
               end: s.end,
               ball: s.sim.live ? s.sim.ball.position : null,
+              focus: focusOf(explain),
             };
           }}
         />
@@ -177,8 +213,17 @@ export function Practice() {
         {HELP.map((h) => (
           <div key={h}>{h}</div>
         ))}
-        <div>Hit assist: {hud.assist ? "on" : "off"}</div>
+        <div>
+          Hit assist: {hud.assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
+        </div>
       </div>
+      {ex.showing && (
+        <ExplainPanel
+          id={ex.showing}
+          onClose={() => explain.set(dismiss(explain.get()))}
+          onOff={() => explain.set(toggle(explain.get()))}
+        />
+      )}
     </>
   );
 }
