@@ -24,6 +24,7 @@ import {
   type ExplainStore,
 } from "./explainStore.ts";
 import { ChaseMarkers, Markings } from "./markings.tsx";
+import { Rules } from "./Rules.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { Player } from "./Player.tsx";
@@ -105,11 +106,14 @@ function Loop({
   game,
   level,
   explain,
+  isPaused,
   onHud,
 }: {
   game: Store;
   level: AiLevel;
   explain: ExplainStore;
+  /** Play is frozen, e.g. while the Marker explains. */
+  isPaused: () => boolean;
   onHud: (h: HudChange) => void;
 }) {
   const ball = useRef<Mesh>(null);
@@ -122,14 +126,14 @@ function Loop({
     const l = loop.current;
     let input = keys.read();
     // Frozen while the Marker explains; the key that resumes isn't a swing.
-    const paused = explain.get().showing !== null;
+    const paused = isPaused();
     if (paused || l.paused) {
       l.paused = paused;
       l.acc = 0;
       return;
     }
     l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP && explain.get().showing === null) {
+    while (l.acc >= STEP && !isPaused()) {
       const { play: before, memory } = game.get();
       l.prev = before.sim.ball.position;
       const view = {
@@ -183,7 +187,7 @@ function Loop({
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
-  "H: hit assist · M: court markings · X: explanations on/off · Esc: leave the match",
+  "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: leave",
 ];
 
 function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
@@ -202,6 +206,13 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     return store;
   });
   const ex = useExplainer(explain);
+  const [rules, setRules] = useState(false);
+  const rulesOpen = useRef(false);
+  const showRules = (open: boolean) => {
+    rulesOpen.current = open;
+    setRules(open);
+  };
+  const isPaused = () => rulesOpen.current || explain.get().showing !== null;
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
     score: `${callScore(start.state.match, LABELS)} · ${tally(start.state)}`,
@@ -222,7 +233,11 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
       if (e.code === "KeyH" && !e.repeat) setHud((h) => ({ ...h, assist: !h.assist }));
       if (e.code === "KeyX" && !e.repeat) explain.set(toggle(explain.get()));
       if (e.code === "KeyM" && !e.repeat) setHud((h) => ({ ...h, markings: !h.markings }));
-      if (e.code === "Escape") onQuit();
+      if (e.code === "Slash" && !e.repeat) showRules(!rulesOpen.current);
+      else if (e.code === "Escape") {
+        if (rulesOpen.current) showRules(false);
+        else onQuit();
+      }
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
@@ -246,7 +261,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           })}
           shirt={OPPONENT_SHIRT}
         />
-        <Loop game={game} level={setup.level} explain={explain} onHud={onHud} />
+        <Loop game={game} level={setup.level} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
         {hud.markings && <Markings />}
         <ChaseMarkers chases={hud.chases} />
@@ -295,6 +310,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           onOff={() => explain.set(toggle(explain.get()))}
         />
       )}
+      {rules && <Rules onClose={() => showRules(false)} />}
       {hud.over && (
         <div style={{ ...panel, left: "50%", top: "40%", transform: "translate(-50%, -50%)" }}>
           <div style={{ fontSize: 18, marginBottom: 8 }}>{hud.score}</div>

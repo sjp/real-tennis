@@ -24,6 +24,7 @@ import {
   type ExplainStore,
 } from "./explainStore.ts";
 import { Markings } from "./markings.tsx";
+import { Rules } from "./Rules.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
 import { AssistRings, FollowCamera, ServeLine } from "./scene.tsx";
@@ -69,10 +70,13 @@ interface Hud {
 function Loop({
   store,
   explain,
+  isPaused,
   onHud,
 }: {
   store: Store;
   explain: ExplainStore;
+  /** Play is frozen, e.g. while the Marker explains. */
+  isPaused: () => boolean;
   onHud: (h: HudChange) => void;
 }) {
   const ball = useRef<Mesh>(null);
@@ -85,14 +89,14 @@ function Loop({
     const l = loop.current;
     let input = keys.read();
     // Frozen while the Marker explains; the key that resumes isn't a swing.
-    const paused = explain.get().showing !== null;
+    const paused = isPaused();
     if (paused || l.paused) {
       l.paused = paused;
       l.acc = 0;
       return;
     }
     l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP && explain.get().showing === null) {
+    while (l.acc >= STEP && !isPaused()) {
       const before = store.get();
       l.prev = before.sim.ball.position;
       const r = practiceStep(world, before, input);
@@ -132,7 +136,7 @@ const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
-  "M: court markings · X: explanations on/off",
+  "M: court markings · X: explanations on/off · ?: rules",
 ];
 
 /** Solo practice: move, hit, and serve, with no opponent. */
@@ -140,6 +144,13 @@ export function Practice() {
   const [store] = useState(createStore);
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
+  const [rules, setRules] = useState(false);
+  const rulesOpen = useRef(false);
+  const showRules = (open: boolean) => {
+    rulesOpen.current = open;
+    setRules(open);
+  };
+  const isPaused = () => rulesOpen.current || explain.get().showing !== null;
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud, setHud] = useState<Hud>(() => ({
     choice: choice(store.get()),
@@ -165,6 +176,9 @@ export function Practice() {
       if (e.code === "KeyH") setHud((h) => ({ ...h, assist: !h.assist }));
       if (e.code === "KeyX") explain.set(toggle(explain.get()));
       if (e.code === "KeyM") setHud((h) => ({ ...h, markings: !h.markings }));
+      if (e.code === "Slash") showRules(!rulesOpen.current);
+      if (e.code === "Escape") showRules(false);
+      if (rulesOpen.current) return;
       // No feeds while the Marker explains.
       if (explain.get().showing) return;
       const run = command[e.code];
@@ -188,7 +202,7 @@ export function Practice() {
         <Court court={court} />
         <ServeLine visible={() => store.get().serve !== null} />
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
-        <Loop store={store} explain={explain} onHud={onHud} />
+        <Loop store={store} explain={explain} isPaused={isPaused} onHud={onHud} />
         {feature && <Highlight feature={feature} />}
         {hud.markings && <Markings />}
         <AssistRings view={() => store.get()} on={hud.assist} />
@@ -222,6 +236,7 @@ export function Practice() {
           Hit assist: {hud.assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
         </div>
       </div>
+      {rules && <Rules onClose={() => showRules(false)} />}
       {ex.showing && (
         <ExplainPanel
           id={ex.showing}
