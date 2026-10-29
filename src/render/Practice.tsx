@@ -152,7 +152,16 @@ export function Practice() {
         <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
         <Loop store={store} onHud={onHud} />
         <AssistRings view={() => store.get()} on={hud.assist} />
-        <FollowCamera target={() => ({ at: store.get().motion.position, end: store.get().end })} />
+        <FollowCamera
+          target={() => {
+            const s = store.get();
+            return {
+              at: s.motion.position,
+              end: s.end,
+              ball: s.sim.live ? s.sim.ball.position : null,
+            };
+          }}
+        />
       </Canvas>
       <div style={{ ...panel, left: 12, top: 12 }}>
         <div>{hud.choice}</div>

@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useRef } from "react";
 import { Vector3, type Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
-import type { FloorPoint, Side } from "../court/types.ts";
+import type { FloorPoint, Side, Vec3 } from "../court/types.ts";
 import { ABOVE, BEHIND } from "./view.ts";
 import { assist, type Assist } from "../game/assist.ts";
 import type { Motion } from "../player/movement.ts";
@@ -11,7 +11,6 @@ import { createWorld, predict, type Prediction, type SimState } from "../sim/wor
 
 const world = createWorld(court);
 const hw = court.floor.width / 2;
-const hl = court.floor.length / 2;
 
 const LOOK_AHEAD = 8;
 /** Seconds for the camera to settle; about 1 s to swing round on a change of ends. */
@@ -20,16 +19,39 @@ const TURN = 0.3;
 /** Seconds of ball flight the hit assist looks ahead. */
 const ASSIST_HORIZON = 3;
 
+/** While the ball is live, how far the view turns towards it (0–1). ⚠ verify in play. */
+const WATCH = 0.4;
+/** How far the camera slides sideways, away from the ball, to keep it in view. */
+const SHIFT = 0.5;
+/** Camera height once behind the end wall: below the end penthouse, whose underside isn't drawn. */
+const UNDER = 2;
+
+/** Camera height at `z`: dropping beneath the end penthouse as the camera nears the end wall. */
+function cameraHeight(z: number): number {
+  const p = court.penthouses;
+  const depth = z > 0 ? p.depth.grille : p.depth.dedans;
+  const into = (Math.abs(z) - (court.floor.length / 2 - depth)) / depth;
+  return ABOVE + (UNDER - ABOVE) * Math.max(0, Math.min(1, into));
+}
+
 /**
- * Keeps the camera behind and above a player, looking down the court and
- * kept inside the walls. Swings round on a change of ends.
+ * Keeps the camera behind and above a player, looking down the court. While
+ * the ball is live it turns part way towards the ball, so a service coming
+ * past the receiver stays in view. Near the end wall the camera drops below
+ * the penthouse and may sit behind the wall, which is drawn one-sided and so
+ * seen through, like the view from the dedans. Swings round on a change of
+ * ends.
  */
-export function FollowCamera({ target }: { target: () => { at: FloorPoint; end: Side } }) {
+export function FollowCamera({
+  target,
+}: {
+  target: () => { at: FloorPoint; end: Side; ball: Vec3 | null };
+}) {
   const camera = useThree((s) => s.camera);
   const look = useRef(new Vector3(0, 1, 0));
   const yaw = useRef<number | null>(null);
   useFrame((_, delta) => {
-    const { at, end } = target();
+    const { at, end, ball } = target();
     const want = end === "service" ? 0 : Math.PI;
     yaw.current ??= want;
     let turn = want - yaw.current;
@@ -38,13 +60,23 @@ export function FollowCamera({ target }: { target: () => { at: FloorPoint; end: 
     const fx = Math.sin(yaw.current);
     const fz = Math.cos(yaw.current);
     const { x, z } = at;
-    let cz = z - fz * BEHIND;
-    const over = Math.max(0, Math.abs(cz) - (hl - 0.3));
-    cz = Math.sign(cz) * Math.min(Math.abs(cz), hl - 0.3);
-    const cx = Math.max(-hw + 0.3, Math.min(hw - 0.3, x - fx * BEHIND));
+    const w = ball ? WATCH : 0;
+    const bx = ball?.x ?? x;
+    const cx = x - fx * BEHIND - SHIFT * w * (bx - x);
     const k = Math.min(1, delta / FOLLOW);
-    camera.position.lerp(new Vector3(cx, ABOVE + over * 0.8, cz), k);
-    look.current.lerp(new Vector3(x + fx * LOOK_AHEAD, 0.5, z + fz * LOOK_AHEAD), k);
+    const cz = z - fz * BEHIND;
+    camera.position.lerp(
+      new Vector3(Math.max(-hw + 0.3, Math.min(hw - 0.3, cx)), cameraHeight(cz), cz),
+      k,
+    );
+    const ahead = new Vector3(x + fx * LOOK_AHEAD, 0.5, z + fz * LOOK_AHEAD);
+    const watched = ball ? new Vector3(ball.x, Math.min(ball.y, 2), ball.z) : ahead;
+    // Part player, part ball, part down the court.
+    const aim = new Vector3(x, 0.5, z)
+      .multiplyScalar(w * 0.75)
+      .addScaledVector(watched, w)
+      .addScaledVector(ahead, 1 - w * 1.75);
+    look.current.lerp(aim, k);
     camera.lookAt(look.current);
   });
   return null;

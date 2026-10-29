@@ -210,7 +210,17 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           })}
           on={hud.assist}
         />
-        <FollowCamera target={() => ({ at: human(game).motion.position, end: human(game).end })} />
+        <FollowCamera
+          target={() => {
+            const sim = game.get().play.sim;
+            const me = human(game);
+            return {
+              at: me.motion.position,
+              end: me.end,
+              ball: sim.live ? sim.ball.position : null,
+            };
+          }}
+        />
       </Canvas>
       <div style={{ ...panel, left: 12, top: 12 }}>
         <div style={{ color: "#ffffff", fontWeight: "bold" }}>{hud.score}</div>
