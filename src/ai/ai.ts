@@ -4,8 +4,17 @@ import { IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input
 import { forwardZ, standardPlayer } from "../player/movement.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import { rally, type PlayerId, type RallyOutcome, type RallyState } from "../rules/rally.ts";
-import type { Vec3 } from "../sim/vec.ts";
-import { STEP, predict, type PlayerCapsule, type SimState, type World } from "../sim/world.ts";
+import type { SimEvent } from "../sim/events.ts";
+import { closestOnSegment } from "../sim/contact.ts";
+import { length, sub, type Vec3 } from "../sim/vec.ts";
+import {
+  STEP,
+  predict,
+  step,
+  type PlayerCapsule,
+  type SimState,
+  type World,
+} from "../sim/world.ts";
 import type { AiPreset } from "./presets.ts";
 
 /** What the AI can see: itself, the ball and the state of the rest. */
@@ -47,6 +56,7 @@ export const FRESH: AiMemory = { seen: "", planned: "", lookAt: 0, plan: null, p
 export const SERVE_DELAY = 1.5;
 /** How far ahead it predicts the ball. */
 const HORIZON = 4;
+const HORIZON_STEPS = Math.round(HORIZON / STEP);
 /** Candidate contacts are checked every few steps. */
 const SAMPLE = 4;
 /** Spare time it wants in hand when running to a ball. */
@@ -133,24 +143,90 @@ const MISSED = Math.round(0.3 / STEP);
 /** Boasts are played from this close to the net. ⚠ verify */
 const BOAST_RANGE = 7;
 
+/** Just inside and outside BODY, squared: nearer or further is clear without `Math.hypot`. */
+const BODY_IN = (BODY * (1 - 1e-6)) ** 2;
+const BODY_OUT = (BODY * (1 + 1e-6)) ** 2;
+/**
+ * Steps predicted past the rest being decided: the last candidate can come a
+ * sample after it, and is kept clear of the body for MISSED steps beyond.
+ */
+const TAIL = 2 * SAMPLE + MISSED;
+
 /**
  * Whether the ball on its way would hit the body as it runs from `from` to
- * `stand`. `path` starts now, a step apart.
+ * `stand`. `path` starts now, a step apart; only its first `end` points count.
  */
 function inTheWay(
   path: readonly Vec3[],
+  end: number,
   from: FloorPoint,
   stand: FloorPoint,
   speed: number,
 ): boolean {
   const d = Math.hypot(stand.x - from.x, stand.z - from.z);
-  return path.some((p, i) => {
-    if (p.y > params.height) return false;
+  // The body stays in this box, so points outside it are clear.
+  const pad = BODY * 1.001;
+  const x0 = Math.min(from.x, stand.x) - pad;
+  const x1 = Math.max(from.x, stand.x) + pad;
+  const z0 = Math.min(from.z, stand.z) - pad;
+  const z1 = Math.max(from.z, stand.z) + pad;
+  const n = Math.min(end, path.length);
+  for (let i = 0; i < n; i++) {
+    const p = path[i]!;
+    if (p.y > params.height || p.x < x0 || p.x > x1 || p.z < z0 || p.z > z1) continue;
     const k = d > 0 ? Math.min(d, speed * i * STEP) / d : 0;
-    const x = from.x + (stand.x - from.x) * k;
-    const z = from.z + (stand.z - from.z) * k;
-    return Math.hypot(p.x - x, p.z - z) < BODY;
-  });
+    const dx = p.x - (from.x + (stand.x - from.x) * k);
+    const dz = p.z - (from.z + (stand.z - from.z) * k);
+    const q = dx * dx + dz * dz;
+    if (q < BODY_IN) return true;
+    if (q <= BODY_OUT && Math.hypot(dx, dz) < BODY) return true;
+  }
+  return false;
+}
+
+/** Whether two values hold the same data, for comparing sim states. */
+function same(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) =>
+    same((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+  );
+}
+
+/**
+ * Whether the ball left alone hits the body: what `predict` with the capsule
+ * added would say. `states` is the flight without it, a step apart; it's
+ * reused while the ball is too far away to touch the body that step, or the
+ * step with the body comes out the same, so only those steps are re-run.
+ */
+function hitsBody(
+  world: World,
+  states: readonly SimState[],
+  capsule: PlayerCapsule,
+  id: PlayerId,
+): boolean {
+  const reach = world.ball.radius + capsule.radius;
+  let s = states[0]!;
+  for (let i = 0; i < HORIZON_STEPS && s.captured === null && !s.asleep; i++) {
+    // Nothing more is reported once the ball is dead.
+    if (!s.live) return false;
+    const known = i + 1 < states.length && s === states[i];
+    if (known) {
+      // Generous: the furthest the ball can get from here within a step.
+      const travel = 2 * (length(s.ball.velocity) + 20) * STEP + 0.5;
+      const p = s.ball.position;
+      if (length(sub(p, closestOnSegment(p, capsule.a, capsule.b))) > reach + travel) {
+        s = states[i + 1]!;
+        continue;
+      }
+    }
+    const r = step(world, s, [capsule]);
+    if (r.events.some((e) => e.type === "playerHit" && e.player === id)) return true;
+    s = known && same(r.state, states[i + 1]) ? states[i + 1]! : r.state;
+  }
+  return false;
 }
 
 /** Where to stand so the ball at `at` meets the racket at its ideal contact point. */
@@ -202,9 +278,24 @@ function makePlan(
 ): Plan {
   const { me, sim } = view;
   const now = sim.time;
-  const prediction = predict(world, sim, HORIZON);
-  const path = prediction.path;
-  const events = prediction.events;
+  // The flight as `predict` gives it, but stopped a little after the rest
+  // is decided: nothing later changes the plan.
+  const states = [sim];
+  const events: SimEvent[] = [];
+  // Leaving it: what the rules engine says happens if nobody touches it.
+  let left = view.rally;
+  let stop = HORIZON_STEPS;
+  for (let i = 0, s = sim; i < stop && s.captured === null && !s.asleep; i++) {
+    const r = step(world, s);
+    s = r.state;
+    states.push(s);
+    for (const e of r.events) {
+      events.push(e);
+      left = rally(left, e).state;
+    }
+    if (left.outcome && stop === HORIZON_STEPS) stop = Math.min(stop, i + 1 + TAIL);
+  }
+  const path = states.map((s) => s.ball.position);
   const f = forwardZ(me.end);
   const speed = preset.speed * params.sprintSpeed;
   const base = basePosition(world, me.end);
@@ -237,23 +328,18 @@ function makePlan(
     const stand = dist(stands[0]!) <= dist(stands[1]!) + 0.5 ? stands[0]! : stands[1]!;
     if (runTime(dist(stand), speed) + SPARE > t - now) continue;
     // Clear of the ball until just after contact, in case of a miss.
-    if (inTheWay(path.slice(0, i + MISSED), pos, stand, speed)) continue;
+    if (inTheWay(path, i + MISSED, pos, stand, speed)) continue;
     const c = { t, i, stand, bounced: judging.drop !== null };
     first ??= c;
     if (c.bounced) afterBounce = c;
   }
 
-  // Leaving it: what the rules engine says happens if nobody touches it.
-  let left = view.rally;
-  for (const e of events) left = rally(left, e).state;
   const leave = outcomeValue(world, left.outcome, me.id, me.end);
   const target = afterBounce ?? first;
   const judged = random() < preset.judgement;
   if (target === null || (judged && leave > preset.keep)) {
     // Keep out of its way: the ball touching a player loses the rest.
-    const hit = predict(world, sim, HORIZON, [capsule]).events.some(
-      (e) => e.type === "playerHit" && e.player === me.id,
-    );
+    const hit = hitsBody(world, states, capsule, me.id);
     const stand = hit ? { x: pos.x + (pos.x > 0 ? -1.5 : 1.5), z: pos.z } : target ? pos : base;
     return { stand, swingAt: null, shot: me.shot, aim: { x: 0, y: 0 } };
   }
@@ -264,9 +350,7 @@ function makePlan(
     x: target.stand.x + gaussian(random) * preset.noise * ahead,
     z: target.stand.z + gaussian(random) * preset.noise * ahead,
   };
-  const stand = inTheWay(path.slice(0, target.i + MISSED), pos, guess, speed)
-    ? target.stand
-    : guess;
+  const stand = inTheWay(path, target.i + MISSED, pos, guess, speed) ? target.stand : guess;
   // A hurried stroke is harder to time.
   const hurry = runTime(dist(stand), speed) / ahead;
   const { shot, aim } = chooseShot(me, view.rally, preset, random);
