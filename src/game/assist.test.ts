@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { standardCourt as court } from "../court/standard.ts";
 import { vec, ZERO } from "../sim/vec.ts";
-import { createWorld, initialState, predict } from "../sim/world.ts";
-import { assist } from "./assist.ts";
+import { createWorld, initialState, predict, step, type SimState } from "../sim/world.ts";
+import { assist, NO_PLAN, planAssist, type AssistPlan } from "./assist.ts";
 
 const world = createWorld(court);
 const coming = initialState({ position: vec(0, 1.5, 8), velocity: vec(0, 4, -14), spin: ZERO });
@@ -25,5 +25,51 @@ describe("assist", () => {
 
   it("ignores balls on the far side of the net", () => {
     expect(assist(prediction, near, "hazard", 0).intercept?.z ?? 1).toBeGreaterThan(0);
+  });
+});
+
+describe("planAssist", () => {
+  const rings = (plan: AssistPlan, sim: SimState) =>
+    assist(plan.prediction!, near, "service", sim.time, 3);
+  const fresh = (sim: SimState) => assist(predict(world, sim, 3), near, "service", sim.time, 3);
+
+  it("keeps one prediction through a long flight, with the rings of a fresh one", () => {
+    const lob = initialState({ position: vec(0, 1, 9), velocity: vec(0.5, 11, -7), spin: ZERO });
+    let sim = lob;
+    let plan = planAssist(NO_PLAN, world, sim);
+    let afresh = 0;
+    for (let n = 1; n <= 240 * 6; n++) {
+      sim = step(world, sim).state;
+      if (n % 4) continue;
+      const next = planAssist(plan, world, sim);
+      const p = next.prediction;
+      if (p && !plan.prediction?.path.includes(p.path[0]!)) afresh++;
+      plan = next;
+      const want = sim.asleep ? null : fresh(sim);
+      expect(plan.prediction ? rings(plan, sim) : null).toEqual(want);
+    }
+    // Only as it meets the floor or a wall, not every frame.
+    expect(afresh).toBeLessThan(20);
+  });
+
+  it("predicts afresh when a racket hit turns the ball where it stands", () => {
+    const plan = planAssist(NO_PLAN, world, coming);
+    const struck = { ...coming, ball: { ...coming.ball, velocity: vec(0, 4, 14) }, lastHitTime: 0 };
+    const next = planAssist(plan, world, struck);
+    expect(next.prediction).not.toBe(plan.prediction);
+    expect(rings(next, struck)).toEqual(fresh(struck));
+  });
+
+  it("predicts afresh when the ball leaves the path, e.g. off a body", () => {
+    const plan = planAssist(NO_PLAN, world, coming);
+    const later = step(world, coming).state;
+    const knocked = { ...later, ball: { ...later.ball, position: vec(0.3, 1.5, 7.9) } };
+    expect(planAssist(plan, world, later).prediction!.path[0]).toBe(plan.prediction!.path[1]);
+    expect(planAssist(plan, world, knocked).prediction).not.toBe(plan.prediction);
+  });
+
+  it("predicts nothing for a ball at rest or in hand", () => {
+    const held = { ...coming, asleep: true };
+    expect(planAssist(NO_PLAN, world, held).prediction).toBeNull();
   });
 });

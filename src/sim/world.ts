@@ -442,6 +442,8 @@ function distanceAlong(body: Body | PlayerCapsule, c: Vec3, n: Vec3): number {
 }
 
 export interface Prediction {
+  /** The sim time of the first point of `path`. */
+  readonly start: number;
   /** The ball's position after each step, starting with the current one. */
   readonly path: readonly Vec3[];
   readonly events: readonly SimEvent[];
@@ -464,5 +466,5 @@ export function predict(
     path.push(s.ball.position);
     events.push(...r.events);
   }
-  return { path, events, state: s };
+  return { start: state.time, path, events, state: s };
 }

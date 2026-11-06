@@ -4,10 +4,17 @@ import { Vector3, type Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { FloorPoint, Side, Vec3 } from "../court/types.ts";
 import { ABOVE, BEHIND } from "./view.ts";
-import { assist, type Assist } from "../game/assist.ts";
+import {
+  assist,
+  ASSIST_HORIZON,
+  NO_PLAN,
+  planAssist,
+  type Assist,
+  type AssistPlan,
+} from "../game/assist.ts";
 import type { Motion } from "../player/movement.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
-import { createWorld, predict, type Prediction, type SimState } from "../sim/world.ts";
+import { createWorld, type SimState } from "../sim/world.ts";
 import { ear } from "../audio/engine.ts";
 
 const world = createWorld(court);
@@ -18,8 +25,6 @@ const LOOK_AHEAD = 8;
 /** Seconds for the camera to settle; about 1 s to swing round on a change of ends. */
 const FOLLOW = 0.15;
 const TURN = 0.3;
-/** Seconds of ball flight the hit assist looks ahead. */
-const ASSIST_HORIZON = 3;
 
 /** While the ball is live, how far the view turns towards it (0–1). ⚠ verify in play. */
 const WATCH = 0.4;
@@ -109,8 +114,8 @@ export function Ears() {
 
 /**
  * The hit-assist rings: where the ball next bounces, and where the player can
- * first reach it. Re-predicts whenever the ball changes course, and a few
- * times a second.
+ * first reach it. Predicts only while shown, and afresh only when the ball
+ * changes course (`planAssist`).
  */
 export function AssistRings({
   view,
@@ -121,23 +126,15 @@ export function AssistRings({
 }) {
   const bounceRing = useRef<Mesh>(null);
   const interceptRing = useRef<Mesh>(null);
-  const plan = useRef<{ prediction: Prediction | null; at: number; key: string }>({
-    prediction: null,
-    at: -1,
-    key: "",
-  });
+  const plan = useRef<AssistPlan>(NO_PLAN);
   useFrame(() => {
-    const { sim, motion, end } = view();
-    const p = plan.current;
-    const key = [sim.lastHitTime, sim.lastFloorTime, sim.lastWallTime, sim.asleep].join("|");
-    if (key !== p.key || sim.time - p.at > 0.25 || sim.time < p.at) {
-      p.prediction = sim.asleep ? null : predict(world, sim, ASSIST_HORIZON);
-      p.at = sim.time;
-      p.key = key;
-    }
-    const rings: Assist = p.prediction
-      ? assist(p.prediction, motion, end, sim.time)
-      : { bounce: null, intercept: null };
+    let rings: Assist = { bounce: null, intercept: null };
+    if (on) {
+      const { sim, motion, end } = view();
+      plan.current = planAssist(plan.current, world, sim);
+      const { prediction } = plan.current;
+      if (prediction) rings = assist(prediction, motion, end, sim.time, ASSIST_HORIZON);
+    } else plan.current = NO_PLAN;
     for (const [mesh, at] of [
       [bounceRing.current, rings.bounce],
       [interceptRing.current, rings.intercept],
