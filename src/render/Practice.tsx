@@ -91,7 +91,12 @@ function Loop({
   const keys = useMemo(() => keyboard(), []);
   const loop = useRef({ prev: store.get().sim.ball.position, acc: 0, paused: false });
 
-  useEffect(() => () => keys.dispose(), [keys]);
+  useEffect(
+    () => () => {
+      keys.dispose();
+    },
+    [keys],
+  );
 
   useFrame((_, delta) => {
     const l = loop.current;
@@ -116,7 +121,7 @@ function Loop({
         onHud({ choice: choice(r.state) });
       for (const n of r.notices) onHud(describeNotice(n));
       const rally = r.state.rally;
-      explainCalls(explain, r.calls, !rally || rally.outcome !== null || rally.striker === null);
+      explainCalls(explain, r.calls, rally?.outcome !== null || rally.striker === null);
       if (r.calls.length > 0)
         onHud((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-3),
@@ -179,8 +184,9 @@ export function Practice() {
     calls: [],
     event: null,
   }));
-  const onHud = (h: HudChange) =>
+  const onHud = (h: HudChange) => {
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
+  };
 
   const [command] = useState(() => (c: Command) => {
     // No feeds while paused, or while the Marker explains.
@@ -196,7 +202,9 @@ export function Practice() {
       if (c) command(c);
     };
     window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
+    return () => {
+      window.removeEventListener("keydown", down);
+    };
   }, [command]);
 
   const s = store.get();
@@ -248,8 +256,15 @@ export function Practice() {
           <TouchControls
             touch={pad}
             athlete={s}
-            extras={COMMANDS.map((c) => ({ label: c.label, onPress: () => command(c) }))}
-            onPause={() => ui.setMenu(true)}
+            extras={COMMANDS.map((c) => ({
+              label: c.label,
+              onPress: () => {
+                command(c);
+              },
+            }))}
+            onPause={() => {
+              ui.setMenu(true);
+            }}
           />
         )
       ) : (
@@ -266,13 +281,19 @@ export function Practice() {
         ui={ui}
         explain={explain}
         leave="Back to the menu"
-        onLeave={() => location.assign(location.pathname)}
+        onLeave={() => {
+          location.assign(location.pathname);
+        }}
       />
       {ex.showing && (
         <ExplainPanel
           id={ex.showing}
-          onClose={() => explain.set(dismiss(explain.get()))}
-          onOff={() => explain.set(toggle(explain.get()))}
+          onClose={() => {
+            explain.set(dismiss(explain.get()));
+          }}
+          onOff={() => {
+            explain.set(toggle(explain.get()));
+          }}
         />
       )}
     </>

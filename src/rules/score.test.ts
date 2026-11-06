@@ -15,6 +15,7 @@ const two = chaseName(court, { side: "service", distance: 1.6 });
 const after = (outcomes: readonly RallyOutcome[], m: MatchState = start) =>
   outcomes.reduce((s, o) => playRest(s, o).state, m);
 const call = (...winners: string[]) => callScore(after(winners.map(win)), labels);
+const times = (n: number, winner: string) => Array.from({ length: n }, () => winner);
 
 describe("callScore", () => {
   it("calls the points with the last winner's score first (Law 12.1)", () => {
@@ -32,19 +33,19 @@ describe("callScore", () => {
 
   it("calls the game and the games", () => {
     expect(call(H, H, H, H)).toBe("Game Player, one game to love");
-    const games = [...Array(8).fill(H), ...Array(4).fill(AI)];
+    const games = [...times(8, H), ...times(4, AI)];
     expect(call(...games)).toBe("Game Opponent, two games to one");
-    expect(call(...games, ...Array(4).fill(AI))).toBe("Game Opponent, two games all");
+    expect(call(...games, ...times(4, AI))).toBe("Game Opponent, two games all");
   });
 
   it("calls the set", () => {
-    const set = Array(24).fill(AI);
+    const set = times(24, AI);
     expect(call(...set)).toBe("Game Opponent, set Opponent, one set to love");
     expect(call(...set, H)).toBe("Fifteen–love");
   });
 
   it("calls the match", () => {
-    expect(call(...Array(48).fill(H))).toBe("Game, set and match Player");
+    expect(call(...times(48, H))).toBe("Game, set and match Player");
   });
 
   it("adds the chases outstanding", () => {

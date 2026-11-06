@@ -9,10 +9,10 @@ export interface PlayUi {
   readonly menu: boolean;
   readonly rules: boolean;
   /** Play is held by the menu or the rules. Read by the game loop. */
-  held(): boolean;
-  setMenu(open: boolean): void;
-  setRules(open: boolean): void;
-  toggleMarkings(): void;
+  readonly held: () => boolean;
+  readonly setMenu: (open: boolean) => void;
+  readonly setRules: (open: boolean) => void;
+  readonly toggleMarkings: () => void;
 }
 
 /**
@@ -48,7 +48,9 @@ export function usePlayUi(explain: ExplainStore): PlayUi {
       if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
     };
     window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
+    return () => {
+      window.removeEventListener("keydown", down);
+    };
   }, [explain]);
 
   return {
@@ -58,6 +60,8 @@ export function usePlayUi(explain: ExplainStore): PlayUi {
     held,
     setMenu,
     setRules,
-    toggleMarkings: () => setMarkings((m) => !m),
+    toggleMarkings: () => {
+      setMarkings((m) => !m);
+    },
   };
 }

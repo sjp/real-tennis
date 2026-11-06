@@ -7,7 +7,7 @@ import { centred, HIGHLIGHT } from "./view.ts";
 import { TouchSetting } from "./TouchSetting.tsx";
 import { Volume } from "./Volume.tsx";
 
-const canFullscreen = () => typeof document !== "undefined" && document.fullscreenEnabled;
+const canFullscreen = () => document.fullscreenEnabled;
 
 function toggleFullscreen() {
   if (document.fullscreenElement) {
@@ -53,19 +53,39 @@ export function PauseMenu({
           }}
         >
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 4 }}>Paused</div>
-          <button style={button} onClick={() => ui.setMenu(false)}>
+          <button
+            style={button}
+            onClick={() => {
+              ui.setMenu(false);
+            }}
+          >
             Resume (Esc)
           </button>
-          <button style={button} onClick={() => ui.setRules(true)}>
+          <button
+            style={button}
+            onClick={() => {
+              ui.setRules(true);
+            }}
+          >
             Rules (?)
           </button>
           <button style={button} onClick={ui.toggleMarkings}>
             Court markings: {onOff(ui.markings)} (M)
           </button>
-          <button style={button} onClick={() => explain.set(toggle(explain.get()))}>
+          <button
+            style={button}
+            onClick={() => {
+              explain.set(toggle(explain.get()));
+            }}
+          >
             Explanations: {onOff(ex.on)} (X)
           </button>
-          <button style={button} onClick={() => settings.set({ assist: !s.assist })}>
+          <button
+            style={button}
+            onClick={() => {
+              settings.set({ assist: !s.assist });
+            }}
+          >
             Hit assist: {onOff(s.assist)} (H)
           </button>
           <Volume />
@@ -80,7 +100,13 @@ export function PauseMenu({
           </button>
         </div>
       )}
-      {ui.rules && <Rules onClose={() => ui.setRules(false)} />}
+      {ui.rules && (
+        <Rules
+          onClose={() => {
+            ui.setRules(false);
+          }}
+        />
+      )}
     </>
   );
 }

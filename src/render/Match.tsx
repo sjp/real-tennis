@@ -111,7 +111,7 @@ function chasesOf(m: MatchState): Pick<Hud, "chases" | "playingOff"> {
 /** Games and sets so far, e.g. "Games 2–1 · Sets 0–0" (the player first). */
 function tally(p: PlayState): string {
   const m = p.match;
-  const pair = (t: typeof m.games) => `${t[PLAYER_ID]}–${t[OPPONENT_ID]}`;
+  const pair = (t: typeof m.games) => `${String(t[PLAYER_ID] ?? 0)}–${String(t[OPPONENT_ID] ?? 0)}`;
   return m.config.sets === 1
     ? `Games ${pair(m.games)}`
     : `Games ${pair(m.games)} · Sets ${pair(m.sets)}`;
@@ -138,7 +138,12 @@ function Loop({
   const keys = useMemo(() => keyboard(), []);
   const loop = useRef({ prev: game.get().play.sim.ball.position, acc: 0, paused: false });
 
-  useEffect(() => () => keys.dispose(), [keys]);
+  useEffect(
+    () => () => {
+      keys.dispose();
+    },
+    [keys],
+  );
 
   useFrame((_, delta) => {
     const l = loop.current;
@@ -248,8 +253,9 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     over: false,
     ...chasesOf(start.state.match),
   }));
-  const onHud = (h: HudChange) =>
+  const onHud = (h: HudChange) => {
     setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
+  };
 
   const me = human(game);
   const { assist } = useSettings();
@@ -325,8 +331,12 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
       {ex.showing && (
         <ExplainPanel
           id={ex.showing}
-          onClose={() => explain.set(dismiss(explain.get()))}
-          onOff={() => explain.set(toggle(explain.get()))}
+          onClose={() => {
+            explain.set(dismiss(explain.get()));
+          }}
+          onOff={() => {
+            explain.set(toggle(explain.get()));
+          }}
         />
       )}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
@@ -343,7 +353,15 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         !ui.menu &&
         !ui.rules &&
         !ex.showing &&
-        !hud.over && <TouchControls touch={pad} athlete={me} onPause={() => ui.setMenu(true)} />
+        !hud.over && (
+          <TouchControls
+            touch={pad}
+            athlete={me}
+            onPause={() => {
+              ui.setMenu(true);
+            }}
+          />
+        )
       ) : (
         <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
           {HELP.map((h) => (
@@ -363,7 +381,9 @@ const LEVELS: readonly AiLevel[] = ["easy", "medium", "hard"];
 
 function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
   const setup = useSettings().match;
-  const setSetup = (match: Setup) => settings.set({ match });
+  const setSetup = (match: Setup) => {
+    settings.set({ match });
+  };
   const row = {
     display: "flex",
     flexWrap: "wrap",
@@ -382,7 +402,9 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
               <input
                 type="radio"
                 checked={setup.level === level}
-                onChange={() => setSetup({ ...setup, level })}
+                onChange={() => {
+                  setSetup({ ...setup, level });
+                }}
               />{" "}
               {level}
             </label>
@@ -395,7 +417,9 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
               <input
                 type="radio"
                 checked={setup.sets === sets}
-                onChange={() => setSetup({ ...setup, sets })}
+                onChange={() => {
+                  setSetup({ ...setup, sets });
+                }}
               />{" "}
               {sets} {sets === 1 ? "set" : "sets"}
             </label>
@@ -406,12 +430,20 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
             <input
               type="checkbox"
               checked={setup.suddenDeath}
-              onChange={(e) => setSetup({ ...setup, suddenDeath: e.target.checked })}
+              onChange={(e) => {
+                setSetup({ ...setup, suddenDeath: e.target.checked });
+              }}
             />{" "}
             Sudden death at forty all (Law 12.1(b))
           </label>
         </div>
-        <button onClick={() => onStart(setup)}>Toss for service and play</button>
+        <button
+          onClick={() => {
+            onStart(setup);
+          }}
+        >
+          Toss for service and play
+        </button>
         <a href="?" style={{ color: HIGHLIGHT, marginLeft: 12 }}>
           Menu
         </a>
@@ -424,5 +456,12 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
 export function Match() {
   const [setup, setSetup] = useState<Setup | null>(null);
   if (!setup) return <StartPanel onStart={setSetup} />;
-  return <MatchGame setup={setup} onQuit={() => setSetup(null)} />;
+  return (
+    <MatchGame
+      setup={setup}
+      onQuit={() => {
+        setSetup(null);
+      }}
+    />
+  );
 }

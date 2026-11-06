@@ -61,7 +61,7 @@ function quiet(s: LessonState): boolean {
   if (s.game.kind === "match")
     return s.game.play.phase !== "play" || s.game.play.rally.striker === null;
   const rally = s.game.practice.rally;
-  return !rally || rally.outcome !== null || rally.striker === null;
+  return rally?.outcome !== null || rally.striker === null;
 }
 
 function choice(s: LessonState): string {
@@ -95,7 +95,12 @@ function Loop({
   const keys = useMemo(() => keyboard(), []);
   const loop = useRef({ prev: simOf(store.get()).ball.position, acc: 0, paused: false });
 
-  useEffect(() => () => keys.dispose(), [keys]);
+  useEffect(
+    () => () => {
+      keys.dispose();
+    },
+    [keys],
+  );
 
   useFrame((_, delta) => {
     const l = loop.current;
@@ -189,7 +194,9 @@ function LessonGame({
     last: null,
     calls: [],
   }));
-  const onHud = (h: (old: Hud) => Partial<Hud>) => setHud((old) => ({ ...old, ...h(old) }));
+  const onHud = (h: (old: Hud) => Partial<Hud>) => {
+    setHud((old) => ({ ...old, ...h(old) }));
+  };
 
   useEffect(() => {
     if (hud.done) onDone();
@@ -208,7 +215,9 @@ function LessonGame({
       }
     };
     window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
+    return () => {
+      window.removeEventListener("keydown", down);
+    };
   }, []);
 
   const s = store.get();
@@ -300,7 +309,15 @@ function LessonGame({
         !hud.done &&
         !ui.menu &&
         !ui.rules &&
-        !ex.showing && <TouchControls touch={pad} athlete={me} onPause={() => ui.setMenu(true)} />
+        !ex.showing && (
+          <TouchControls
+            touch={pad}
+            athlete={me}
+            onPause={() => {
+              ui.setMenu(true);
+            }}
+          />
+        )
       ) : (
         <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
           {HELP.map((h) => (
@@ -341,8 +358,12 @@ function LessonGame({
       {ex.showing && !intro && (
         <ExplainPanel
           id={ex.showing}
-          onClose={() => explain.set(dismiss(explain.get()))}
-          onOff={() => explain.set(toggle(explain.get()))}
+          onClose={() => {
+            explain.set(dismiss(explain.get()));
+          }}
+          onOff={() => {
+            explain.set(toggle(explain.get()));
+          }}
         />
       )}
     </>
@@ -380,16 +401,24 @@ export function Learn() {
       <LessonGame
         key={attempt}
         lesson={lesson}
-        onDone={() =>
+        onDone={() => {
           setDone((d) => {
             if (d.includes(lesson.id)) return d;
             const next = [...d, lesson.id];
             saveDone(next);
             return next;
-          })
+          });
+        }}
+        onNext={
+          playing + 1 < LESSONS.length
+            ? () => {
+                open(playing + 1);
+              }
+            : null
         }
-        onNext={playing + 1 < LESSONS.length ? () => open(playing + 1) : null}
-        onQuit={() => setPlaying(null)}
+        onQuit={() => {
+          setPlaying(null);
+        }}
       />
     );
   }
@@ -420,7 +449,9 @@ export function Learn() {
           >
             <span style={{ width: 16, color: HIGHLIGHT }}>{done.includes(l.id) ? "✓" : ""}</span>
             <button
-              onClick={() => open(i)}
+              onClick={() => {
+                open(i);
+              }}
               style={{ minWidth: "min(260px, 70vw)", textAlign: "left" }}
             >
               {i + 1}. {l.title}

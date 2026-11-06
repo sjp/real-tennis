@@ -2,8 +2,7 @@ import { useSyncExternalStore } from "react";
 import { useSettings } from "./settings.ts";
 
 /** Whether the last input was a touch rather than a key. Starts from the kind of screen. */
-let touched =
-  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+let touched = "matchMedia" in globalThis && matchMedia("(pointer: coarse)").matches;
 const listeners = new Set<() => void>();
 
 function set(t: boolean) {
@@ -13,10 +12,22 @@ function set(t: boolean) {
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("pointerdown", (e) => set(e.pointerType === "touch" || touched), {
-    capture: true,
-  });
-  window.addEventListener("keydown", () => set(false), { capture: true });
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      set(e.pointerType === "touch" || touched);
+    },
+    {
+      capture: true,
+    },
+  );
+  window.addEventListener(
+    "keydown",
+    () => {
+      set(false);
+    },
+    { capture: true },
+  );
 }
 
 const subscribe = (l: () => void) => {

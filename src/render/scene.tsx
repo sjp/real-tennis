@@ -129,7 +129,7 @@ export function AssistRings({
   useFrame(() => {
     const { sim, motion, end } = view();
     const p = plan.current;
-    const key = `${sim.lastHitTime}|${sim.lastFloorTime}|${sim.lastWallTime}|${sim.asleep}`;
+    const key = [sim.lastHitTime, sim.lastFloorTime, sim.lastWallTime, sim.asleep].join("|");
     if (key !== p.key || sim.time - p.at > 0.25 || sim.time < p.at) {
       p.prediction = sim.asleep ? null : predict(world, sim, ASSIST_HORIZON);
       p.at = sim.time;

@@ -119,7 +119,7 @@ describe("practice", () => {
     const { state, calls } = swingAt(fed, 0);
     expect(state.rally?.striker).toBe("human");
     expect(calls).toHaveLength(1);
-    expect(state.rally?.outcome).toMatchObject({ kind: expect.stringMatching(/point|chase/) });
+    expect(state.rally?.outcome?.kind).toMatch(/point|chase/);
   });
 
   it("judges an unreturned machine feed as a chase on the player's side", () => {

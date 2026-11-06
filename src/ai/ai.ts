@@ -318,7 +318,7 @@ export function aiInput(
 
   // The ball in play. It looks again whenever it changes course.
   const r = view.rally;
-  const seen = `${sim.lastHitTime}|${sim.lastFloorTime}|${sim.lastWallTime}|${sim.captured}`;
+  const seen = [sim.lastHitTime, sim.lastFloorTime, sim.lastWallTime, sim.captured].join("|");
   let m = memory;
   if (seen !== m.seen) m = { ...m, seen, lookAt: now + preset.reaction };
   const coming = r.striker !== null && r.striker !== me.id && sim.live && !sim.asleep;

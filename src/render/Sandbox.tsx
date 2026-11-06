@@ -103,7 +103,9 @@ function useSandboxControls(onShot: (shot: Shot) => void) {
       wx: { value: first.spin[0], step: 10, label: "spin x" },
       wy: { value: first.spin[1], step: 10, label: "spin y" },
       wz: { value: first.spin[2], step: 10, label: "spin z" },
-      Fire: button((get) => onShot(makeShot(get))),
+      Fire: button((get) => {
+        onShot(makeShot(get));
+      }),
     }),
     Presets: folder(
       Object.fromEntries(
@@ -197,7 +199,7 @@ function EventLog({ events }: { events: readonly SimEvent[] }) {
       {events.map((e, i) => (
         <li key={i} style={{ color: EVENT_COLOUR[e.type] }}>
           {e.time.toFixed(3)}s {e.type} · {e.surface}
-          {"bounce" in e ? ` #${e.bounce}` : ""}
+          {"bounce" in e ? ` #${String(e.bounce)}` : ""}
           {"edge" in e && e.edge ? " (edge)" : ""}
           {"face" in e ? ` (${e.face} face${e.cord ? ", cord" : ""})` : ""}
         </li>

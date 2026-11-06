@@ -99,7 +99,9 @@ export function Rules({ onClose }: { onClose?: () => void }) {
           {back}
           <select
             value={id}
-            onChange={(e) => setId(e.target.value)}
+            onChange={(e) => {
+              setId(e.target.value);
+            }}
             style={{ display: "block", marginTop: 8, maxWidth: "100%" }}
           >
             {TOPICS.map((t) => (
@@ -127,7 +129,9 @@ export function Rules({ onClose }: { onClose?: () => void }) {
               {ENTRIES.filter((e) => e.topic === t.id).map((e) => (
                 <div key={e.id}>
                   <button
-                    onClick={() => setId(e.id)}
+                    onClick={() => {
+                      setId(e.id);
+                    }}
                     style={{
                       all: "unset",
                       cursor: "pointer",

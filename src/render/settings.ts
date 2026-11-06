@@ -71,9 +71,9 @@ function save(s: Settings) {
 
 /** The settings, kept outside React so game loops and the audio can read them. */
 export interface SettingsStore {
-  get(): Settings;
-  set(change: Partial<Settings>): void;
-  subscribe(listener: () => void): () => void;
+  readonly get: () => Settings;
+  readonly set: (change: Partial<Settings>) => void;
+  readonly subscribe: (listener: () => void) => () => void;
 }
 
 export function createSettingsStore(): SettingsStore {

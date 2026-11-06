@@ -41,7 +41,11 @@ export function Settings() {
           <TouchSetting />
         </Row>
         <Row label="Hit assist">
-          <button onClick={() => settings.set({ assist: !s.assist })}>
+          <button
+            onClick={() => {
+              settings.set({ assist: !s.assist });
+            }}
+          >
             {s.assist ? "On" : "Off"}
           </button>
           <span style={{ color: "#888" }}>
@@ -49,8 +53,19 @@ export function Settings() {
           </span>
         </Row>
         <Row label="Explanations">
-          <button onClick={() => explain.set(toggle(ex))}>{ex.on ? "On" : "Off"}</button>
-          <button disabled={ex.seen.length === 0} onClick={() => explain.set(reset(ex))}>
+          <button
+            onClick={() => {
+              explain.set(toggle(ex));
+            }}
+          >
+            {ex.on ? "On" : "Off"}
+          </button>
+          <button
+            disabled={ex.seen.length === 0}
+            onClick={() => {
+              explain.set(reset(ex));
+            }}
+          >
             {ex.seen.length === 0 ? "Nothing explained yet" : "Explain everything again"}
           </button>
         </Row>
@@ -62,7 +77,7 @@ export function Settings() {
               setLessons(0);
             }}
           >
-            {lessons === 0 ? "None completed" : `Clear ${lessons} completed`}
+            {lessons === 0 ? "None completed" : `Clear ${String(lessons)} completed`}
           </button>
         </Row>
         <p style={{ marginTop: 16 }}>

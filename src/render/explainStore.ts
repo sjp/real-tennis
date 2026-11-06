@@ -12,9 +12,9 @@ const ON = "realTennis.explanations";
 
 /** The explanations' state, kept outside React so the game loop can read it. */
 export interface ExplainStore {
-  get(): Explainer;
-  set(e: Explainer): void;
-  subscribe(listener: () => void): () => void;
+  readonly get: () => Explainer;
+  readonly set: (e: Explainer) => void;
+  readonly subscribe: (listener: () => void) => () => void;
 }
 
 function load(): Explainer {

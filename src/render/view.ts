@@ -20,7 +20,7 @@ export function cameraStart(at: FloorPoint, end: Side): [number, number, number]
  */
 export const DPR: [number, number] = [
   1,
-  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? 1.5 : 2,
+  "matchMedia" in globalThis && matchMedia("(pointer: coarse)").matches ? 1.5 : 2,
 ];
 
 /** Show the frame-rate meter: `?fps`. */
@@ -69,7 +69,9 @@ export function describeNotice(n: Notice): { last?: string; event?: null } {
     case "shot": {
       const ms = Math.round(Math.abs(n.timing.error) * 1000);
       const when =
-        n.timing.grade === "perfect" ? "" : ` · ${n.timing.error > 0 ? "early" : "late"} ${ms} ms`;
+        n.timing.grade === "perfect"
+          ? ""
+          : ` · ${n.timing.error > 0 ? "early" : "late"} ${String(ms)} ms`;
       return { last: `${n.shot}: ${n.timing.grade}${when}`, event: null };
     }
   }

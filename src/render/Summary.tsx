@@ -29,7 +29,7 @@ export function Summary({
   onNew: () => void;
 }) {
   const s = summarise([you, them], rests);
-  const pair = (t: Tally) => `${t[you]}–${t[them]}`;
+  const pair = (t: Tally) => `${String(t[you] ?? 0)}–${String(t[them] ?? 0)}`;
   const cell = { padding: "2px 0 2px 16px", textAlign: "right" } as const;
   return (
     <div style={{ ...centred, padding: "16px 20px", border: `1px solid ${HIGHLIGHT}` }}>

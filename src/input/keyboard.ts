@@ -30,7 +30,9 @@ export function keyboard(target: Window = window): Keyboard {
   };
   const up = (e: KeyboardEvent) => held.delete(e.code);
   // Keys held when the window loses focus never see their keyup.
-  const blur = () => held.clear();
+  const blur = () => {
+    held.clear();
+  };
   target.addEventListener("keydown", down);
   target.addEventListener("keyup", up);
   target.addEventListener("blur", blur);

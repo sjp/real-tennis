@@ -18,16 +18,16 @@ export interface Stick {
  * the keyboard.
  */
 export interface Touch {
-  stickStart(id: number, x: number, y: number): void;
-  stickMove(id: number, x: number, y: number): void;
-  stickEnd(id: number): void;
+  readonly stickStart: (id: number, x: number, y: number) => void;
+  readonly stickMove: (id: number, x: number, y: number) => void;
+  readonly stickEnd: (id: number) => void;
   /** The joystick, for drawing, or null when no thumb is on it. */
-  stick(): Stick | null;
-  swing(): void;
-  select(n: number): void;
-  sprint(held: boolean): void;
+  readonly stick: () => Stick | null;
+  readonly swing: () => void;
+  readonly select: (n: number) => void;
+  readonly sprint: (held: boolean) => void;
   /** The current input. Presses since the last read count once. */
-  read(): InputState;
+  readonly read: () => InputState;
 }
 
 export function touch(): Touch {

@@ -6,7 +6,9 @@ export function useMedia(query: string): boolean {
     (l) => {
       const m = window.matchMedia(query);
       m.addEventListener("change", l);
-      return () => m.removeEventListener("change", l);
+      return () => {
+        m.removeEventListener("change", l);
+      };
     },
     () => window.matchMedia(query).matches,
   );

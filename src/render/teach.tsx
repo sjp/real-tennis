@@ -25,7 +25,12 @@ export function Highlight({
   const shape = useMemo(() => featureShape(court, feature), [feature]);
   const geometry = useMemo(() => polygonGeometry(shape.polygons), [shape]);
   const material = useRef<MeshBasicMaterial>(null);
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(
+    () => () => {
+      geometry.dispose();
+    },
+    [geometry],
+  );
   useFrame(({ clock }) => {
     if (material.current && pulse)
       material.current.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 4);
@@ -64,8 +69,13 @@ export function Label({
   size?: number;
 }) {
   const texture = useMemo(() => labelTexture(text, colour), [text, colour]);
-  useEffect(() => () => texture.dispose(), [texture]);
-  const { width, height } = texture.image as HTMLCanvasElement;
+  useEffect(
+    () => () => {
+      texture.dispose();
+    },
+    [texture],
+  );
+  const { width, height } = texture.image;
   return (
     <sprite position={position} scale={[(size * width) / height, size, 1]} renderOrder={2}>
       <spriteMaterial map={texture} depthTest={false} transparent sizeAttenuation={false} />
@@ -75,7 +85,7 @@ export function Label({
 
 function labelTexture(text: string, colour: string): CanvasTexture {
   const px = 48;
-  const font = `${px}px ui-monospace, monospace`;
+  const font = `${String(px)}px ui-monospace, monospace`;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
   ctx.font = font;
@@ -118,7 +128,9 @@ export function ExplainPanel({
       }
     };
     window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
+    return () => {
+      window.removeEventListener("keydown", down);
+    };
   }, [onClose]);
   return (
     <div

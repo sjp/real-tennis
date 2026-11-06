@@ -99,7 +99,7 @@ const shapes = new WeakMap<CourtDefinition, Map<CourtFeature, FeatureShape>>();
 /** The polygons that show `f`, and where to label it. */
 export function featureShape(court: CourtDefinition, f: CourtFeature): FeatureShape {
   let cache = shapes.get(court);
-  if (!cache) shapes.set(court, (cache = new Map()));
+  if (!cache) shapes.set(court, (cache = new Map<CourtFeature, FeatureShape>()));
   let shape = cache.get(f);
   if (!shape) cache.set(f, (shape = buildShape(court, f)));
   return shape;

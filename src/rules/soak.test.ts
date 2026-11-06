@@ -93,7 +93,7 @@ function problems(prev: MatchState, m: MatchState, o: RallyOutcome): string[] {
   const max = (t: MatchState["points"]) => Math.max(t.a!, t.b!);
   fail(!(prev.playOff.length > 0 && o.kind === "chase"), "chase laid during a play-off (Law 9.2)");
   fail(players.includes(m.server as "a"), "unknown server");
-  fail(m.faults === 0 || m.faults === 1, "fault count");
+  fail([0, 1].includes(m.faults), "fault count");
   fail(max(m.games) < 6, "a set not ended at six games (Law 13)");
   fail(m.sets.a! + m.sets.b! === m.setScores.length, "set count");
   fail(
@@ -128,11 +128,11 @@ describe("soak: fuzzed matches through the whole engine", () => {
         const o = playRandomRest(m, random);
         kinds.add(o.kind);
         const next = playRest(m, o).state;
-        found.push(...problems(m, next, o).map((p) => `seed ${seed}: ${p}`));
+        found.push(...problems(m, next, o).map((p) => `seed ${String(seed)}: ${p}`));
         m = next;
       }
       if (m.winner === null || m.sets[m.winner] !== Math.ceil(sets / 2))
-        found.push(`seed ${seed}: unfinished`);
+        found.push(`seed ${String(seed)}: unfinished`);
     }
     expect(found).toEqual([]);
     expect(kinds).toEqual(new Set(["point", "fault", "chase", "chaseOff", "let"]));

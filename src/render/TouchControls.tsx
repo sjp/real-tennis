@@ -141,9 +141,15 @@ export function TouchControls({
           e.currentTarget.setPointerCapture(e.pointerId);
           thumb(e, touch.stickStart);
         }}
-        onPointerMove={(e) => thumb(e, touch.stickMove)}
-        onPointerUp={(e) => thumb(e, (id) => touch.stickEnd(id))}
-        onPointerCancel={(e) => thumb(e, (id) => touch.stickEnd(id))}
+        onPointerMove={(e) => {
+          thumb(e, touch.stickMove);
+        }}
+        onPointerUp={(e) => {
+          thumb(e, touch.stickEnd);
+        }}
+        onPointerCancel={(e) => {
+          thumb(e, touch.stickEnd);
+        }}
       >
         {stick ? (
           <Joystick stick={stick} />
@@ -164,7 +170,9 @@ export function TouchControls({
       <div style={{ pointerEvents: "auto" }}>
         <Press
           style={{ ...round, right: 24, bottom: 24, width: 96, height: 96, fontSize: 16 }}
-          onPress={() => touch.swing()}
+          onPress={() => {
+            touch.swing();
+          }}
         >
           {serving ? "Toss / Swing" : "Swing"}
         </Press>
@@ -204,7 +212,9 @@ export function TouchControls({
           {serving ? (
             <Press
               style={{ ...pill, borderColor: HIGHLIGHT }}
-              onPress={() => touch.select(((athlete.serveStyle + 1) % SERVE_STYLES.length) + 1)}
+              onPress={() => {
+                touch.select(((athlete.serveStyle + 1) % SERVE_STYLES.length) + 1);
+              }}
             >
               Serve: {style.name} ▸
             </Press>
@@ -217,7 +227,9 @@ export function TouchControls({
                   borderColor: shot === athlete.shot ? HIGHLIGHT : (pill.border as string),
                   color: shot === athlete.shot ? HIGHLIGHT : "#ffffff",
                 }}
-                onPress={() => touch.select(i + 1)}
+                onPress={() => {
+                  touch.select(i + 1);
+                }}
               >
                 {SHOT_NAMES[shot]}
               </Press>

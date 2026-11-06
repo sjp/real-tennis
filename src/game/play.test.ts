@@ -28,7 +28,8 @@ describe("a match", () => {
   const { state: start, calls } = startPlay(world, config, () => 0.2, labels);
 
   it("starts with the toss winner serving, and the receiver at the hazard end", () => {
-    expect(calls).toMatchObject([{ id: "coinToss", message: expect.stringContaining("Player") }]);
+    expect(calls).toMatchObject([{ id: "coinToss" }]);
+    expect(calls[0]?.message).toContain("Player");
     expect(start.match.server).toBe("a");
     expect(athleteOf(start, "a")).toMatchObject({
       end: "service",

@@ -12,9 +12,11 @@ export function Volume() {
         max={1}
         step={0.05}
         value={volume}
-        onChange={(e) => settings.set({ volume: Number(e.target.value) })}
+        onChange={(e) => {
+          settings.set({ volume: Number(e.target.value) });
+        }}
       />
-      {volume === 0 ? "off" : `${Math.round(volume * 100)}%`}
+      {volume === 0 ? "off" : `${String(Math.round(volume * 100))}%`}
     </label>
   );
 }

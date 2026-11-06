@@ -59,7 +59,8 @@ export interface Athlete {
 
 /** Things the game reports beyond the physics, for the HUD and 050. */
 export type Notice =
-  | { readonly type: "shot"; readonly shot: ShotType | string; readonly timing: Timing }
+  // `shot` is a ShotType, or the serve style's name.
+  | { readonly type: "shot"; readonly shot: string; readonly timing: Timing }
   | { readonly type: "whiff" }
   /**
    * A server fault for 050 to consume: on or over the Second Gallery line

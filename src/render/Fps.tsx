@@ -27,12 +27,14 @@ export function FpsMeter() {
       const now = performance.now();
       const fps = ((stats.frames - frames) * 1000) / (now - last);
       setText(
-        `${fps.toFixed(0)} fps · ${stats.calls} draws · ${(stats.triangles / 1000).toFixed(1)}k tris · pixel ratio ${stats.dpr} of ${devicePixelRatio}`,
+        `${fps.toFixed(0)} fps · ${String(stats.calls)} draws · ${(stats.triangles / 1000).toFixed(1)}k tris · pixel ratio ${String(stats.dpr)} of ${String(devicePixelRatio)}`,
       );
       last = now;
       frames = stats.frames;
     }, 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+    };
   }, []);
   return (
     <div style={{ ...panel, left: "50%", bottom: 8, transform: "translateX(-50%)", fontSize: 11 }}>

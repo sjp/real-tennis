@@ -17,10 +17,10 @@ export function callPoints(m: MatchState, labels: Labels): string {
   const b = m.points[opponentOf(m, first)]!;
   if (a >= 3 && b >= 3) {
     if (a === b) return m.config.suddenDeath ? "Forty all" : "Deuce";
-    return `Advantage ${labels[a > b ? first : opponentOf(m, first)]}`;
+    return `Advantage ${labels[a > b ? first : opponentOf(m, first)]!}`;
   }
   if (a === b) return `${capital(POINTS[a]!)} all`;
-  return `${capital(POINTS[a]!)}–${POINTS[b]}`;
+  return `${capital(POINTS[a]!)}–${POINTS[b]!}`;
 }
 
 /** "Two games to one", "Three games all", or "" at love all. */
@@ -42,7 +42,7 @@ function tally(m: MatchState, t: MatchState["games"], unit: string): string {
   const units = lead === 1 ? unit : `${unit}s`;
   if (a === b) return `${capital(NUMBERS[a]!)} ${units} all`;
   const [hi, lo] = a > b ? [a, b] : [b, a];
-  return `${capital(NUMBERS[hi]!)} ${units} to ${NUMBERS[lo]}`;
+  return `${capital(NUMBERS[hi]!)} ${units} to ${NUMBERS[lo]!}`;
 }
 
 /** "chase better than two (1.83 m)", or "hazard chase the line (…)". */
@@ -57,12 +57,12 @@ export function callChase(call: ChaseCall): string {
  * calls the game and the games (or sets).
  */
 export function callScore(m: MatchState, labels: Labels): string {
-  if (m.winner !== null) return `Game, set and match ${labels[m.winner]}`;
+  if (m.winner !== null) return `Game, set and match ${labels[m.winner]!}`;
   const parts: string[] = [];
   if (m.newGame && m.lastGame !== null) {
     const games = callGames(m);
-    parts.push(`Game ${labels[m.lastGame]}`);
-    parts.push(games || `set ${labels[m.lastGame]}`);
+    parts.push(`Game ${labels[m.lastGame]!}`);
+    parts.push(games || `set ${labels[m.lastGame]!}`);
     if (!games) parts.push(callSets(m));
   } else parts.push(callPoints(m, labels));
   parts.push(...[...m.playOff, ...m.chases].map(callChase));

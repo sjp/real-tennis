@@ -12,7 +12,12 @@ export function TouchSetting() {
   return (
     <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
       Touch controls
-      <select value={touch} onChange={(e) => settings.set({ touch: e.target.value as TouchMode })}>
+      <select
+        value={touch}
+        onChange={(e) => {
+          settings.set({ touch: e.target.value as TouchMode });
+        }}
+      >
         {MODES.map(([mode, name]) => (
           <option key={mode} value={mode}>
             {name}

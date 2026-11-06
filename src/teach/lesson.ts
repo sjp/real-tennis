@@ -177,7 +177,7 @@ function matchStep(
     decided,
     end: athleteOf(play, PLAYER_ID).end,
   };
-  if (reset && !state.lesson.scores(stepView) && setup.kind === "match")
+  if (reset && !state.lesson.scores(stepView))
     play = { ...playFrom(world, setup.match(world.court)), sim: play.sim, since: play.sim.time };
   return {
     game: { kind: "match", play, memory: ai.memory },

@@ -11,7 +11,8 @@ import { createWorld } from "../src/sim/world.ts";
 const world = createWorld(standardCourt);
 const [a = "hard", b = "easy", count = "6"] = process.argv.slice(2);
 const levels = [a, b] as AiLevel[];
-if (!levels.every((l) => l in AI_PRESETS)) throw new Error(`Levels are ${Object.keys(AI_PRESETS)}`);
+if (!levels.every((l) => l in AI_PRESETS))
+  throw new Error(`Levels are ${Object.keys(AI_PRESETS).join(", ")}`);
 
 const players = ["A", "B"] as const;
 const presets = { A: AI_PRESETS[levels[0]!], B: AI_PRESETS[levels[1]!] };
@@ -41,8 +42,10 @@ for (let seed = 1; seed <= Number(count); seed++) {
 }
 
 console.log(`A (${a}) v B (${b}), ${count} one-set matches`);
-console.log(`Sets ${sets.A}–${sets.B}, games ${games.A}–${games.B}`);
-console.log(`${rests} rests, ${(strokes / rests).toFixed(1)} strokes a rest`);
+console.log(
+  `Sets ${String(sets.A)}–${String(sets.B)}, games ${String(games.A)}–${String(games.B)}`,
+);
+console.log(`${String(rests)} rests, ${(strokes / rests).toFixed(1)} strokes a rest`);
 for (const [way, n] of Object.entries(ways).toSorted((x, y) => y[1] - x[1]))
   console.log(`${String(n).padStart(5)}  ${way}`);
 console.log(`(${((Date.now() - started) / 1000).toFixed(1)} s)`);

@@ -33,7 +33,7 @@ describe("AI against AI", () => {
       const { state, rests } = playAi(world, config, presets, 1, LIMIT);
       expect(state.phase).toBe("over");
       expect(state.match.winner).not.toBeNull();
-      expect(rests.map(reason).filter((r) => BLUNDERS.includes(r as TeachingId))).toEqual([]);
+      expect(rests.map(reason).filter((r) => BLUNDERS.includes(r))).toEqual([]);
     },
     SLOW,
   );

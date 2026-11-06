@@ -66,7 +66,7 @@ export function ChaseMarkers({ chases }: { chases: readonly ChaseCall[] }) {
               <meshBasicMaterial color={CHASE} />
             </mesh>
             <Label
-              text={`Chase ${i + 1}: ${c.name}`}
+              text={`Chase ${String(i + 1)}: ${c.name}`}
               position={[hw - 2.5, 0.4, z]}
               colour={CHASE}
               size={0.035}

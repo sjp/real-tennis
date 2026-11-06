@@ -91,7 +91,7 @@ export function startPlay(
   const server = coinToss(config.players, random);
   return {
     state: playFrom(world, startMatch(world.court, config, server)),
-    calls: [teach("coinToss", `${labels[server]} to serve`)],
+    calls: [teach("coinToss", `${labels[server]!} to serve`)],
   };
 }
 

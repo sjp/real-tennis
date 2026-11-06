@@ -56,8 +56,11 @@ const net = (face: Side, cord = false): SimEvent => ({
   cord,
   surface: "net",
 });
-const simple = (type: "tambourHit" | "outOfCourt" | "nick" | "restOnFloor", z = 0): SimEvent =>
-  ({ ...at(-hw, 0.03, z), type, surface: type === "tambourHit" ? "tambour" : "floor" }) as SimEvent;
+const simple = (type: "tambourHit" | "outOfCourt" | "nick" | "restOnFloor", z = 0): SimEvent => ({
+  ...at(-hw, 0.03, z),
+  type,
+  surface: type === "tambourHit" ? "tambour" : "floor",
+});
 
 /** A point in the Service Court, one in the Hazard Court, and one on the service side. */
 const serviceCourt = bounce(hw - 0.5, hl - 1);
@@ -277,10 +280,8 @@ describe("laying chases (Law 9.2)", () => {
       hazardCourt(3),
       hazardCourt(1),
     ]);
-    expect(o).toMatchObject({
-      kind: "chase",
-      call: { mark: { side: "hazard", distance: expect.closeTo(1) } },
-    });
+    expect(o).toMatchObject({ kind: "chase", call: { mark: { side: "hazard" } } });
+    expect(o?.kind === "chase" && o.call.mark.distance).toBeCloseTo(1);
   });
 
   it("marks the gallery line for a ball entering a gallery (Law 9.2(b))", () => {

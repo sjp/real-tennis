@@ -171,7 +171,7 @@ export function hear(
   shotOf?: (player: string) => ShotType | undefined,
 ) {
   const g = graph;
-  if (!g || g.ctx.state !== "running" || volume === 0) return;
+  if (g?.ctx.state !== "running" || volume === 0) return;
   for (const e of events) {
     const shot = e.type === "racketHit" ? shotOf?.(e.player) : undefined;
     const s = soundOf(e, speed, ear.current, shot);
