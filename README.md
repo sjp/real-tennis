@@ -67,6 +67,7 @@ npm run fmt       # format
 npm test          # unit tests (Vitest)
 npm run build     # production build into dist/
 npm run preview   # serve dist/ at http://localhost:4173/real-tennis/
+npm run icons     # regenerate the PNG/ICO icons from public/favicon.svg
 ```
 
 Every push to `main` runs CI on Node 24, 26 and latest. When CI passes, the

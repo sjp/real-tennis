@@ -10,7 +10,8 @@
     "check": "oxlint --deny-warnings && oxfmt --check && tsc -b",
     "fmt": "oxfmt",
     "test": "vitest run --passWithNoTests",
-    "ai:stats": "node scripts/ai-stats.ts"
+    "ai:stats": "node scripts/ai-stats.ts",
+    "icons": "node scripts/icons.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -21,6 +22,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
