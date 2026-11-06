@@ -106,6 +106,7 @@ export function playFrom(world: World, match: MatchState): PlayState {
     serveStyle: 0,
     swing: null,
     serve: null,
+    struck: null,
   });
   const blank: PlayState = {
     sim: held(vec(0, world.ball.radius, 0), 0),
@@ -122,18 +123,22 @@ export function athleteOf(s: PlayState, id: PlayerId): Athlete {
   return s.athletes.find((a) => a.id === id)!;
 }
 
-/** One fixed step of a match. Pure: the same inputs give the same result. */
+/**
+ * One fixed step of a match. Pure: the same inputs give the same result.
+ * Players in `autoHit` strike rally balls that come into reach (130).
+ */
 export function playStep(
   world: World,
   state: PlayState,
   inputs: Readonly<Record<PlayerId, InputState>>,
+  autoHit: readonly PlayerId[] = [],
 ): PlayResult {
   const events: SimEvent[] = [];
   const notices: { player: PlayerId; notice: Notice }[] = [];
   const judged: RallyInput[] = [];
   let sim = state.sim;
   let athletes = state.athletes.map((a) => {
-    const r = act(world, a, sim, inputs[a.id]!);
+    const r = act(world, a, sim, inputs[a.id]!, autoHit.includes(a.id));
     sim = r.sim;
     events.push(...r.events);
     judged.push(...r.judged);

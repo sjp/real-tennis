@@ -7,7 +7,7 @@ import { grade, POOR, SWING_TIME, type Timing } from "../player/timing.ts";
 import type { RallyInput } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { hit } from "../sim/racket.ts";
-import { vec, ZERO, type Vec3 } from "../sim/vec.ts";
+import { madd, vec, ZERO, type Vec3 } from "../sim/vec.ts";
 import {
   initialState,
   predict,
@@ -31,6 +31,8 @@ export const HIGH = 1.8;
 const REACH = 0.8;
 /** How far it can be at contact, after a mistimed swing, and still be hit. */
 const STRETCH = 1.5;
+/** How close the ball must come to the ideal point to be hit automatically (130). */
+export const AUTO_REACH = 0.5;
 
 export interface Swinging {
   /** When swing was pressed. Contact is SWING_TIME later. */
@@ -55,6 +57,8 @@ export interface Athlete {
   readonly swing: Swinging | null;
   /** Null when not serving; otherwise whether the ball is tossed yet. */
   readonly serve: "ready" | "tossed" | null;
+  /** When this athlete last struck the ball, so auto-hit leaves their own shot alone. */
+  readonly struck: number | null;
 }
 
 /** Things the game reports beyond the physics, for the HUD and 050. */
@@ -153,10 +157,44 @@ export interface Action {
 }
 
 /**
- * A player's part of one fixed step, before the ball moves: choosing, tossing,
- * swinging, running, and striking the ball if the swing meets it.
+ * Whether to strike the ball automatically this step (130), and with what
+ * timing. Rally balls only: never a serve, never the athlete's own shot, and
+ * not during a manual swing. It fires at the ball's closest approach inside
+ * AUTO_REACH, graded by how far that is from the ideal point.
  */
-export function act(world: World, athlete: Athlete, sim: SimState, input: InputState): Action {
+export function autoContact(
+  a: Athlete,
+  sim: SimState,
+): { readonly timing: Timing; readonly backhand: boolean } | null {
+  if (a.swing !== null || a.serve !== null) return null;
+  if (!sim.live || sim.asleep || sim.captured !== null || sim.lastHitTime === a.struck) return null;
+  const b = sim.ball.position;
+  const next = madd(b, sim.ball.velocity, STEP);
+  let best = { d: Infinity, backhand: false };
+  for (const backhand of [false, true]) {
+    const d = miss(a.motion, a.end, backhand, b);
+    if (d < best.d) best = { d, backhand };
+  }
+  if (best.d > AUTO_REACH || miss(a.motion, a.end, best.backhand, next) < best.d) return null;
+  // Ahead of the ideal point counts as early, behind it as late.
+  const c = idealContact(a.motion, a.end, best.backhand);
+  const ahead = (b.z - c.z) * forwardZ(a.end) >= 0 ? 1 : -1;
+  const error = (ahead * best.d * POOR) / AUTO_REACH;
+  return { timing: grade(error, best.backhand), backhand: best.backhand };
+}
+
+/**
+ * A player's part of one fixed step, before the ball moves: choosing, tossing,
+ * swinging, running, and striking the ball if the swing meets it. With
+ * `autoHit`, a rally ball that comes into reach is struck without a swing.
+ */
+export function act(
+  world: World,
+  athlete: Athlete,
+  sim: SimState,
+  input: InputState,
+  autoHit = false,
+): Action {
   const notices: Notice[] = [];
   const judged: RallyInput[] = [];
   const events: SimEvent[] = [];
@@ -210,8 +248,30 @@ export function act(world: World, athlete: Athlete, sim: SimState, input: InputS
         timing: timed.timing,
       });
       sim = struck.state;
-      a = { ...a, serve: null };
+      a = { ...a, serve: null, struck: sim.time };
     }
+  }
+
+  const auto = autoHit ? autoContact(a, sim) : null;
+  if (auto) {
+    // Shown as a swing already at contact, so the follow-through plays.
+    a = {
+      ...a,
+      swing: {
+        start: sim.time - SWING_TIME,
+        path: [],
+        backhand: auto.backhand,
+        contact: true,
+        serve: false,
+      },
+    };
+    const racket = planShot(world, a.id, a.shot, sim.ball, a.end, input.move, auto.timing).racket;
+    const struck = hit(world.ball, sim, racket);
+    events.push(...struck.events);
+    judged.push(...struck.events);
+    notices.push({ type: "shot", shot: a.shot, timing: auto.timing });
+    sim = struck.state;
+    a = { ...a, struck: sim.time };
   }
   if (a.swing && sim.time >= a.swing.start + SWING_TIME + FOLLOW_THROUGH) a = { ...a, swing: null };
 

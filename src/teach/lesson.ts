@@ -73,17 +73,21 @@ export function learner(s: LessonState) {
   return s.game.kind === "drill" ? s.game.practice : athleteOf(s.game.play, PLAYER_ID);
 }
 
-/** One fixed step of a lesson. `random` drives the machine and the AI. */
+/**
+ * One fixed step of a lesson. `random` drives the machine and the AI;
+ * `autoHit` lets the learner strike rally balls that come into reach (130).
+ */
 export function lessonStep(
   world: World,
   state: LessonState,
   input: InputState,
   random: () => number,
+  autoHit = false,
 ): LessonResult {
   const r =
     state.game.kind === "drill"
-      ? drillStep(world, state, input, random)
-      : matchStep(world, state, input, random);
+      ? drillStep(world, state, input, random, autoHit)
+      : matchStep(world, state, input, random, autoHit);
   if (state.done) return { ...r, state: { ...state, game: r.game }, scored: false };
   const scored = state.lesson.scores(r.view);
   const progress = state.progress + (scored ? 1 : 0);
@@ -109,12 +113,13 @@ function drillStep(
   state: LessonState,
   input: InputState,
   random: () => number,
+  autoHit: boolean,
 ): Stepped {
   const g = state.game;
   if (g.kind !== "drill") throw new Error("not a drill");
   const setup = state.lesson.setup;
   const before = g.practice.rally?.outcome ?? null;
-  const r = practiceStep(world, g.practice, input);
+  const r = practiceStep(world, g.practice, input, autoHit);
   let p = r.state;
   const now = p.sim.time;
   const outcome = p.rally?.outcome ?? null;
@@ -150,6 +155,7 @@ function matchStep(
   state: LessonState,
   input: InputState,
   random: () => number,
+  autoHit: boolean,
 ): Stepped {
   const g = state.game;
   if (g.kind !== "match") throw new Error("not a match");
@@ -163,7 +169,12 @@ function matchStep(
     since: before.since,
   };
   const ai = aiInput(world, view, AI_PRESETS.easy, g.memory, random, playerCapsule(me));
-  const r = playStep(world, before, { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input });
+  const r = playStep(
+    world,
+    before,
+    { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input },
+    autoHit ? [PLAYER_ID] : [],
+  );
   let play = r.state;
   const setup = state.lesson.setup;
   // Each rest that leaves the objective unmet starts again from the setup.

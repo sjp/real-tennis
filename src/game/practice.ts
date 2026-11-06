@@ -52,6 +52,7 @@ export function initialPractice(world: World): PracticeState {
     serveStyle: 0,
     swing: null,
     serve: null,
+    struck: null,
     rally: null,
   };
 }
@@ -74,13 +75,17 @@ function practiceRally(
   );
 }
 
-/** One fixed step of solo practice. Pure: the same inputs give the same result. */
+/**
+ * One fixed step of solo practice. Pure: the same inputs give the same
+ * result. `autoHit` strikes rally balls that come into reach (130).
+ */
 export function practiceStep(
   world: World,
   state: PracticeState,
   input: InputState,
+  autoHit = false,
 ): PracticeResult {
-  const acted = act(world, state, state.sim, input);
+  const acted = act(world, state, state.sim, input, autoHit);
   let s: PracticeState = { ...state, ...acted.athlete, sim: acted.sim };
   const events = [...acted.events];
   const notices = [...acted.notices];

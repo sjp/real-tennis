@@ -4,7 +4,8 @@ import { IDLE, type InputState } from "../input/input.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import type { SimEvent } from "../sim/events.ts";
-import { createWorld, STEP } from "../sim/world.ts";
+import { vec, ZERO } from "../sim/vec.ts";
+import { createWorld, initialState, STEP } from "../sim/world.ts";
 import {
   changeEnds,
   feedDrop,
@@ -14,20 +15,25 @@ import {
   startServe,
   type PracticeState,
 } from "./practice.ts";
-import { idealContact, type Notice } from "./player.ts";
+import { autoContact, idealContact, rightX, type Notice } from "./player.ts";
 
 const world = createWorld(court);
 const hl = court.floor.length / 2;
 const swing: InputState = { ...IDLE, swing: true };
 
 /** Runs for `seconds`, pressing `input` on the first step only. */
-function run(state: PracticeState, seconds: number, input: InputState = IDLE) {
+function run(state: PracticeState, seconds: number, input: InputState = IDLE, autoHit = false) {
   const events: SimEvent[] = [];
   const notices: Notice[] = [];
   const calls: string[] = [];
   let s = state;
   for (let i = 0; i < Math.round(seconds / STEP); i++) {
-    const r = practiceStep(world, s, i === 0 ? input : { ...input, swing: false, select: null });
+    const r = practiceStep(
+      world,
+      s,
+      i === 0 ? input : { ...input, swing: false, select: null },
+      autoHit,
+    );
     s = r.state;
     events.push(...r.events);
     notices.push(...r.notices);
@@ -110,6 +116,65 @@ describe("serving", () => {
     const { notices, calls } = run(ready, 2, swing);
     expect(notices).toContainEqual({ type: "serverFault", reason: "missed" });
     expect(calls).toEqual(["faultMissed"]);
+  });
+});
+
+describe("auto-hit (130)", () => {
+  // High over the player's head on the way in, so it's only in reach off the back wall.
+  const pz = -hl + 3.5;
+  const deep: PracticeState = {
+    ...initialPractice(world),
+    motion: { position: { x: 0, z: pz }, velocity: { x: 0, z: 0 } },
+    sim: initialState(
+      { position: vec(rightX("service") * 0.7, 2.6, -2), velocity: vec(0, 3, -14), spin: ZERO },
+      0,
+    ),
+  };
+
+  it("hits a back-wall rebound without a swing", () => {
+    const { events, notices } = run(deep, 3, IDLE, true);
+    const wall = events.findIndex((e) => e.type === "wallHit");
+    const hits = events.filter((e) => e.type === "racketHit");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ player: "human" });
+    expect(events.indexOf(hits[0]!)).toBeGreaterThan(wall);
+    expect(wall).toBeGreaterThanOrEqual(0);
+    expect(notices[0]).toMatchObject({ type: "shot", shot: "cut", timing: { grade: "perfect" } });
+  });
+
+  it("leaves the ball alone when it's off", () => {
+    expect(run(deep, 3).events.some((e) => e.type === "racketHit")).toBe(false);
+  });
+
+  it("grades by how close the ball comes to the ideal point", () => {
+    const c = idealContact(fed.motion, fed.end, false);
+    const at = (dx: number) => ({
+      ...fed.sim,
+      ball: { position: vec(c.x + dx, c.y, c.z), velocity: ZERO, spin: ZERO },
+    });
+    expect(autoContact(fed, at(0))).toMatchObject({
+      backhand: false,
+      timing: { grade: "perfect" },
+    });
+    expect(autoContact(fed, at(0.2))?.timing.grade).toBe("good");
+    expect(autoContact(fed, at(0.4))?.timing.grade).toBe("poor");
+    expect(autoContact(fed, at(0.6))).toBeNull();
+  });
+
+  it("never touches the player's own shot, a serve, or a swing in progress", () => {
+    const c = idealContact(fed.motion, fed.end, false);
+    const sim = { ...fed.sim, ball: { position: c, velocity: ZERO, spin: ZERO }, lastHitTime: 4 };
+    expect(autoContact({ ...fed, struck: 3 }, sim)).not.toBeNull();
+    expect(autoContact({ ...fed, struck: 4 }, sim)).toBeNull();
+    expect(autoContact({ ...fed, serve: "tossed" }, sim)).toBeNull();
+    const swinging = run(fed, STEP, swing).state;
+    expect(autoContact(swinging, sim)).toBeNull();
+  });
+
+  it("still needs a swing to serve", () => {
+    const tossed = run(startServe(court, initialPractice(world)), STEP, swing).state;
+    const { notices } = run(tossed, 2, IDLE, true);
+    expect(notices).toContainEqual({ type: "serverFault", reason: "missed" });
   });
 });
 
