@@ -3,7 +3,7 @@ import { SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
 import { forwardZ, move, standardPlayer, type Motion } from "../player/movement.ts";
 import { handPosition, overServiceLine, planServe, SERVE_STYLES, toss } from "../player/serve.ts";
 import { planShot } from "../player/shot.ts";
-import { grade, POOR, SWING_TIME, type Timing } from "../player/timing.ts";
+import { GOOD, grade, PERFECT, POOR, SWING_TIME, type Timing } from "../player/timing.ts";
 import type { RallyInput } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { hit } from "../sim/racket.ts";
@@ -31,8 +31,13 @@ export const HIGH = 1.8;
 const REACH = 0.8;
 /** How far it can be at contact, after a mistimed swing, and still be hit. */
 const STRETCH = 1.5;
-/** How close the ball must come to the ideal point to be hit automatically (130). */
-export const AUTO_REACH = 0.5;
+/** How close the ball must come to the body to be hit automatically (131). */
+export const AUTO_REACH = 1.25;
+/** Closer than this, the ball is about to hit the body, so it's struck now. */
+const AUTO_BODY = 0.6;
+/** The heights an auto-hit takes the ball at: wider than a timed swing's. */
+const AUTO_LOW = 0.1;
+const AUTO_HIGH = 2.2;
 
 export interface Swinging {
   /** When swing was pressed. Contact is SWING_TIME later. */
@@ -157,10 +162,10 @@ export interface Action {
 }
 
 /**
- * Whether to strike the ball automatically this step (130), and with what
- * timing. Rally balls only: never a serve, never the athlete's own shot, and
- * not during a manual swing. It fires at the ball's closest approach inside
- * AUTO_REACH, graded by how far that is from the ideal point.
+ * Whether to strike the ball automatically this step (130, 131). Rally balls
+ * only: never a serve, never the athlete's own shot, and not during a manual
+ * swing. It fires when the ball is within AUTO_REACH of the body, at its
+ * closest approach, or straight away if it's about to hit the body.
  */
 export function autoContact(
   a: Athlete,
@@ -169,18 +174,25 @@ export function autoContact(
   if (a.swing !== null || a.serve !== null) return null;
   if (!sim.live || sim.asleep || sim.captured !== null || sim.lastHitTime === a.struck) return null;
   const b = sim.ball.position;
-  const next = madd(b, sim.ball.velocity, STEP);
-  let best = { d: Infinity, backhand: false };
-  for (const backhand of [false, true]) {
-    const d = miss(a.motion, a.end, backhand, b);
-    if (d < best.d) best = { d, backhand };
-  }
-  if (best.d > AUTO_REACH || miss(a.motion, a.end, best.backhand, next) < best.d) return null;
-  // Ahead of the ideal point counts as early, behind it as late.
-  const c = idealContact(a.motion, a.end, best.backhand);
-  const ahead = (b.z - c.z) * forwardZ(a.end) >= 0 ? 1 : -1;
-  const error = (ahead * best.d * POOR) / AUTO_REACH;
-  return { timing: grade(error, best.backhand), backhand: best.backhand };
+  const d = nearness(a.motion, b);
+  if (d > AUTO_REACH) return null;
+  const next = nearness(a.motion, madd(b, sim.ball.velocity, STEP));
+  if (next < d && next > AUTO_BODY) return null;
+  const { x, z } = a.motion.position;
+  // Whichever side of the body it's on; dead centre is a forehand.
+  const backhand = (b.x - x) * rightX(a.end) < 0;
+  // Perfect in the inner half, easing to the edge of "good" at full reach.
+  const inner = AUTO_REACH / 2;
+  const late = Math.max(0, d - inner) / (AUTO_REACH - inner);
+  const ahead = (b.z - z) * forwardZ(a.end) >= 0 ? 1 : -1;
+  const error = d <= inner ? 0 : ahead * (PERFECT + late * (GOOD - PERFECT));
+  return { timing: grade(error, backhand), backhand };
+}
+
+/** How far a ball at `b` is from the body's axis, plus how far outside the auto-hit heights. */
+function nearness(m: Motion, b: Vec3): number {
+  const height = Math.max(0, AUTO_LOW - b.y, b.y - AUTO_HIGH);
+  return Math.hypot(b.x - m.position.x, b.z - m.position.z) + height;
 }
 
 /**

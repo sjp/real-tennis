@@ -4,7 +4,7 @@ import { IDLE, type InputState } from "../input/input.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import type { SimEvent } from "../sim/events.ts";
-import { vec, ZERO } from "../sim/vec.ts";
+import { vec, ZERO, type Vec3 } from "../sim/vec.ts";
 import { createWorld, initialState, STEP } from "../sim/world.ts";
 import {
   changeEnds,
@@ -119,17 +119,17 @@ describe("serving", () => {
   });
 });
 
-describe("auto-hit (130)", () => {
-  // High over the player's head on the way in, so it's only in reach off the back wall.
-  const pz = -hl + 3.5;
-  const deep: PracticeState = {
+describe("auto-hit (130, 131)", () => {
+  /** The player at `pz`, with a ball coming from `from` at `velocity`. */
+  const setup = (pz: number, from: Vec3, velocity: Vec3): PracticeState => ({
     ...initialPractice(world),
     motion: { position: { x: 0, z: pz }, velocity: { x: 0, z: 0 } },
-    sim: initialState(
-      { position: vec(rightX("service") * 0.7, 2.6, -2), velocity: vec(0, 3, -14), spin: ZERO },
-      0,
-    ),
-  };
+    sim: initialState({ position: from, velocity, spin: ZERO }, 0),
+  });
+  // Angled into the back corner: out of reach on the way in, across the player on the way out.
+  const deep = setup(-hl + 2, vec(-3.5, 1.2, -hl + 6), vec(5, 1, -12));
+  // Straight at the player's body.
+  const straight = setup(-hl + 4, vec(0, 1, -2), vec(0, 1, -15));
 
   it("hits a back-wall rebound without a swing", () => {
     const { events, notices } = run(deep, 3, IDLE, true);
@@ -142,23 +142,35 @@ describe("auto-hit (130)", () => {
     expect(notices[0]).toMatchObject({ type: "shot", shot: "cut", timing: { grade: "perfect" } });
   });
 
-  it("leaves the ball alone when it's off", () => {
-    expect(run(deep, 3).events.some((e) => e.type === "racketHit")).toBe(false);
+  it("hits a ball coming straight at the body, instead of taking it on the body", () => {
+    const types = run(straight, 2, IDLE, true).events.map((e) => e.type);
+    expect(types).toContain("racketHit");
+    expect(types).not.toContain("playerHit");
   });
 
-  it("grades by how close the ball comes to the ideal point", () => {
-    const c = idealContact(fed.motion, fed.end, false);
-    const at = (dx: number) => ({
+  it("leaves the ball alone when it's off", () => {
+    expect(run(deep, 3).events.some((e) => e.type === "racketHit")).toBe(false);
+    expect(run(straight, 2).events.map((e) => e.type)).toContain("playerHit");
+  });
+
+  it("grades by how near the ball is to the body, never worse than good", () => {
+    const { x, z } = fed.motion.position;
+    const right = rightX(fed.end);
+    const at = (side: number, y = 1) => ({
       ...fed.sim,
-      ball: { position: vec(c.x + dx, c.y, c.z), velocity: ZERO, spin: ZERO },
+      ball: { position: vec(x + right * side, y, z), velocity: ZERO, spin: ZERO },
     });
     expect(autoContact(fed, at(0))).toMatchObject({
       backhand: false,
       timing: { grade: "perfect" },
     });
-    expect(autoContact(fed, at(0.2))?.timing.grade).toBe("good");
-    expect(autoContact(fed, at(0.4))?.timing.grade).toBe("poor");
-    expect(autoContact(fed, at(0.6))).toBeNull();
+    expect(autoContact(fed, at(0.6))).toMatchObject({ timing: { grade: "perfect" } });
+    expect(autoContact(fed, at(-0.6))).toMatchObject({ backhand: true });
+    expect(autoContact(fed, at(1.2))?.timing.grade).toBe("good");
+    expect(autoContact(fed, at(1.3))).toBeNull();
+    // Low skidders and high rebounds count.
+    expect(autoContact(fed, at(0.6, 0.12))).not.toBeNull();
+    expect(autoContact(fed, at(0.6, 2.15))).not.toBeNull();
   });
 
   it("never touches the player's own shot, a serve, or a swing in progress", () => {

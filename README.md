@@ -23,8 +23,8 @@ Pick a mode from the menu:
 
 ## Controls
 
-With auto-hit on (the default), you hit rally balls automatically by running
-into them, so Space is only needed to serve or to take a ball early. Turn it
+With auto-hit on (the default), you hit rally balls automatically when you get
+near them, so Space is only needed to serve or to take a ball early. Turn it
 off in Settings or the pause menu to time every swing yourself.
 
 ### Keyboard
