@@ -47,7 +47,7 @@ import {
 import { FpsMeter, FpsProbe } from "./Fps.tsx";
 
 const world = createWorld(court);
-const OPPONENT_SHIRT = "#b5443c";
+const OPPONENT_TRIM = "#b5443c";
 interface Store {
   get(): LessonState;
   set(s: LessonState): void;
@@ -252,7 +252,7 @@ function LessonGame({
                 ? { athlete: athleteOf(g.play, OPPONENT_ID), time: g.play.sim.time }
                 : { athlete: learner(store.get()), time: 0 };
             }}
-            shirt={OPPONENT_SHIRT}
+            trim={OPPONENT_TRIM}
           />
         )}
         <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />

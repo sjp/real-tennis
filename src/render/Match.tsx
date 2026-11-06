@@ -54,7 +54,7 @@ import { FpsMeter, FpsProbe } from "./Fps.tsx";
 const world = createWorld(court);
 const OPPONENT_ID = "opponent";
 const LABELS: Labels = { [PLAYER_ID]: "Player", [OPPONENT_ID]: "Opponent" };
-const OPPONENT_SHIRT = "#b5443c";
+const OPPONENT_TRIM = "#b5443c";
 
 interface Game {
   readonly play: PlayState;
@@ -281,7 +281,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
             athlete: athleteOf(game.get().play, OPPONENT_ID),
             time: game.get().play.sim.time,
           })}
-          shirt={OPPONENT_SHIRT}
+          trim={OPPONENT_TRIM}
         />
         <Loop
           game={game}
