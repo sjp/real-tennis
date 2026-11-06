@@ -3,13 +3,19 @@ import { useEffect, useState } from "react";
 import { panel } from "./view.ts";
 
 /** What the renderer did last frame, for the meter. */
-const stats = { calls: 0, triangles: 0, frames: 0, dpr: 1 };
+const stats = { calls: 0, triangles: 0, frames: 0, dpr: 1, worst: 0, slow: 0 };
+
+/** A frame longer than this shows as a hitch at 60 Hz. */
+const SLOW_MS = 25;
 
 /** Inside the canvas: counts frames and draw calls. */
 export function FpsProbe() {
   const gl = useThree((s) => s.gl);
-  useFrame(() => {
+  useFrame((_, delta) => {
+    const ms = delta * 1000;
     stats.frames++;
+    stats.worst = Math.max(stats.worst, ms);
+    if (ms > SLOW_MS) stats.slow++;
     stats.calls = gl.info.render.calls;
     stats.triangles = gl.info.render.triangles;
     stats.dpr = gl.getPixelRatio();
@@ -17,7 +23,7 @@ export function FpsProbe() {
   return null;
 }
 
-/** Frames per second and draw calls, once a second. Shown with `?fps`. */
+/** Frames per second, the worst frame, and draw calls, once a second. Shown with `?fps`. */
 export function FpsMeter() {
   const [text, setText] = useState("");
   useEffect(() => {
@@ -27,10 +33,12 @@ export function FpsMeter() {
       const now = performance.now();
       const fps = ((stats.frames - frames) * 1000) / (now - last);
       setText(
-        `${fps.toFixed(0)} fps · ${String(stats.calls)} draws · ${(stats.triangles / 1000).toFixed(1)}k tris · pixel ratio ${String(stats.dpr)} of ${String(devicePixelRatio)}`,
+        `${fps.toFixed(0)} fps · worst ${stats.worst.toFixed(0)} ms · ${String(stats.slow)} slow · ${String(stats.calls)} draws · ${(stats.triangles / 1000).toFixed(1)}k tris · pixel ratio ${String(stats.dpr)} of ${String(devicePixelRatio)}`,
       );
       last = now;
       frames = stats.frames;
+      stats.worst = 0;
+      stats.slow = 0;
     }, 1000);
     return () => {
       clearInterval(id);
