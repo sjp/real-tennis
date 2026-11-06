@@ -5,7 +5,11 @@ const ITEMS = [
   { href: "?practice", title: "Practice", text: "On your own, with a ball machine" },
   { href: "?match", title: "Match", text: "Play against the computer" },
   { href: "?rules", title: "Rules", text: "The Laws, explained with the court" },
-  { href: "?settings", title: "Settings", text: "Sound, controls, hit assist and progress" },
+  {
+    href: "?settings",
+    title: "Settings",
+    text: "Sound, controls, hit assist, auto-hit and progress",
+  },
 ] as const;
 
 /** The home menu. */

@@ -37,7 +37,7 @@ import { length } from "../sim/vec.ts";
 import { cameraStart, describeEvent, describeNotice, panel, hudPanel, DPR, FPS } from "./view.ts";
 import { FpsMeter, FpsProbe } from "./Fps.tsx";
 import { Player } from "./Player.tsx";
-import { useSettings } from "./settings.ts";
+import { settings, useSettings } from "./settings.ts";
 
 const world = createWorld(court);
 
@@ -112,7 +112,7 @@ function Loop({
     while (l.acc >= STEP && !isPaused()) {
       const before = store.get();
       l.prev = before.sim.ball.position;
-      const r = practiceStep(world, before, input);
+      const r = practiceStep(world, before, input, settings.get().autoHit);
       hear(r.events, length(before.sim.ball.velocity), () => before.shot);
       store.set(r.state);
       input = { ...input, swing: false, select: null };

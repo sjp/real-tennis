@@ -6,6 +6,7 @@ describe("parseSettings", () => {
     const s = {
       volume: 0.2,
       assist: false,
+      autoHit: false,
       touch: "on",
       match: { level: "hard", sets: 5, suddenDeath: true },
     };

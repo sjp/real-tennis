@@ -19,9 +19,13 @@ Pick a mode from the menu:
 - **Practice**: on your own, with a ball machine.
 - **Match**: singles against the computer (Easy, Medium or Hard; 1, 3 or 5 sets).
 - **Rules**: the Laws, explained with the court.
-- **Settings**: sound, controls, hit assist and progress.
+- **Settings**: sound, controls, hit assist, auto-hit and progress.
 
 ## Controls
+
+With auto-hit on (the default), you hit rally balls automatically by running
+into them, so Space is only needed to serve or to take a ball early. Turn it
+off in Settings or the pause menu to time every swing yourself.
 
 ### Keyboard
 

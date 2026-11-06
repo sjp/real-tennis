@@ -28,7 +28,7 @@ import { Player } from "./Player.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { loadDone, saveDone } from "./progress.ts";
 import { usePlayUi } from "./playUi.ts";
-import { useSettings } from "./settings.ts";
+import { settings, useSettings } from "./settings.ts";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { hear } from "../audio/engine.ts";
 import { PLAYER_ID } from "../game/practice.ts";
@@ -116,7 +116,7 @@ function Loop({
     while (l.acc >= STEP && !isPaused()) {
       const before = store.get();
       l.prev = simOf(before).ball.position;
-      const r = lessonStep(world, before, input, Math.random);
+      const r = lessonStep(world, before, input, Math.random, settings.get().autoHit);
       hear(r.events, length(simOf(before).ball.velocity), (p) =>
         p === PLAYER_ID ? learner(before).shot : undefined,
       );

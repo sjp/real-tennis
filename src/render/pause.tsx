@@ -88,6 +88,14 @@ export function PauseMenu({
           >
             Hit assist: {onOff(s.assist)} (H)
           </button>
+          <button
+            style={button}
+            onClick={() => {
+              settings.set({ autoHit: !s.autoHit });
+            }}
+          >
+            Auto-hit: {onOff(s.autoHit)}
+          </button>
           <Volume />
           <TouchSetting />
           {canFullscreen() && (

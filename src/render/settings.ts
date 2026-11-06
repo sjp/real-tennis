@@ -18,6 +18,8 @@ export interface Settings {
   /** Master volume, 0 to 1. */
   readonly volume: number;
   readonly assist: boolean;
+  /** Strike rally balls automatically on running into them (130). */
+  readonly autoHit: boolean;
   readonly touch: TouchMode;
   /** The last match set up from the start panel. */
   readonly match: MatchSetup;
@@ -26,6 +28,7 @@ export interface Settings {
 export const DEFAULTS: Settings = {
   volume: 0.7,
   assist: true,
+  autoHit: true,
   touch: "auto",
   match: { level: "easy", sets: 1, suddenDeath: false },
 };
@@ -44,6 +47,7 @@ export function parseSettings(raw: unknown): Settings {
   return {
     volume: typeof r.volume === "number" && r.volume >= 0 && r.volume <= 1 ? r.volume : d.volume,
     assist: typeof r.assist === "boolean" ? r.assist : d.assist,
+    autoHit: typeof r.autoHit === "boolean" ? r.autoHit : d.autoHit,
     touch: pick(r.touch, ["auto", "on", "off"] as const, d.touch),
     match: {
       level: pick(m.level, ["easy", "medium", "hard"] as const, d.match.level),

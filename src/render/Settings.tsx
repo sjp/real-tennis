@@ -52,6 +52,16 @@ export function Settings() {
             Rings where the ball will bounce and where to meet it
           </span>
         </Row>
+        <Row label="Auto-hit">
+          <button
+            onClick={() => {
+              settings.set({ autoHit: !s.autoHit });
+            }}
+          >
+            {s.autoHit ? "On" : "Off"}
+          </button>
+          <span style={{ color: "#888" }}>Hit rally balls automatically when you reach them</span>
+        </Row>
         <Row label="Explanations">
           <button
             onClick={() => {

@@ -168,7 +168,12 @@ function Loop({
       };
       const capsule = playerCapsule(view.me);
       const ai = aiInput(world, view, AI_PRESETS[level], memory, Math.random, capsule);
-      const r = playStep(world, before, { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input });
+      const r = playStep(
+        world,
+        before,
+        { [PLAYER_ID]: input, [OPPONENT_ID]: ai.input },
+        settings.get().autoHit ? [PLAYER_ID] : [],
+      );
       const strokes = struck + strokesIn(before, r.events);
       const rest = decided(before, r.state, strokes);
       game.set({
