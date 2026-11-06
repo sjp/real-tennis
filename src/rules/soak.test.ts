@@ -123,7 +123,7 @@ describe("soak: fuzzed matches through the whole engine", () => {
       const random = () => (s = (s * 16807) % 2147483647) / 2147483647;
       const sets = ([1, 3, 5] as const)[seed % 3]!;
       const config = { players, sets, suddenDeath: seed % 4 === 0 };
-      let m = startMatch(court, config, players[seed % 2]);
+      let m = startMatch(court, config, players[seed % 2]!);
       for (let rests = 0; m.winner === null && rests < 20000; rests++) {
         const o = playRandomRest(m, random);
         kinds.add(o.kind);
