@@ -48,6 +48,15 @@ import {
   FPS,
 } from "./view.ts";
 import { FpsMeter, FpsProbe } from "./Fps.tsx";
+import {
+  BALL_JUMP,
+  blendAthlete,
+  blendTime,
+  blendVec,
+  createBlend,
+  STEP_FIRST,
+  type Blend,
+} from "./blend.ts";
 
 const world = createWorld(court);
 const OPPONENT_TRIM = "#b5443c";
@@ -104,16 +113,19 @@ const Loop = memo(function Loop({
   explain,
   isPaused,
   hud,
+  blend,
 }: {
   store: Store;
   pad: Touch;
   explain: ExplainStore;
   isPaused: () => boolean;
   hud: HudStore<Hud>;
+  /** Where the views draw from: the state before the latest step, and how far past it. */
+  blend: Blend<LessonState>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ prev: simOf(store.get()).ball.position, acc: 0, paused: false });
+  const loop = useRef({ acc: 0, paused: false });
 
   useEffect(
     () => () => {
@@ -135,7 +147,7 @@ const Loop = memo(function Loop({
     l.acc += Math.min(delta, 0.1);
     while (l.acc >= STEP && !isPaused()) {
       const before = store.get();
-      l.prev = simOf(before).ball.position;
+      blend.stepping(before);
       const r = lessonStep(world, before, input, Math.random, settings.get().autoHit);
       hear(r.events, length(simOf(before).ball.velocity), (p) =>
         p === PLAYER_ID ? learner(before).shot : undefined,
@@ -161,11 +173,11 @@ const Loop = memo(function Loop({
           ...chasesOf(r.state),
         }));
     }
-    const a = l.prev;
-    const b = simOf(store.get()).ball.position;
-    const t = l.acc / STEP;
-    ball.current?.position.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
-  });
+    blend.at(l.acc / STEP);
+    const at = drawnBall(blend, store.get());
+    ball.current?.position.set(at.x, at.y, at.z);
+    // Before anything draws from the state this frame.
+  }, STEP_FIRST);
 
   return (
     <mesh ref={ball}>
@@ -227,15 +239,35 @@ function LessonTouch({
   return <TouchControls touch={pad} athlete={learner(store.get())} onPause={onPause} />;
 }
 
-/** The scene's views of the lesson, made once so the scene can skip re-rendering. */
-function sceneViews(store: Store, explain: ExplainStore, lesson: Lesson, intro: () => boolean) {
+/** The ball as drawn, between the last two steps. */
+const drawnBall = (blend: Blend<LessonState>, s: LessonState) =>
+  blendVec(simOf(blend.prev()).ball.position, simOf(s).ball.position, blend.t(), BALL_JUMP);
+
+/** The opponent in a match lesson, if there is one. */
+const opponentOf = (s: LessonState) =>
+  s.game.kind === "match" ? athleteOf(s.game.play, OPPONENT_ID) : undefined;
+
+/**
+ * The scene's views of the lesson, made once so the scene can skip re-rendering.
+ * The figures and the camera are drawn between steps; the hit assist predicts
+ * from the stepped state, as the game does.
+ */
+function sceneViews(
+  store: Store,
+  explain: ExplainStore,
+  lesson: Lesson,
+  intro: () => boolean,
+  blend: Blend<LessonState>,
+) {
+  const time = () => blendTime(simOf(blend.prev()).time, simOf(store.get()).time, blend.t());
+  const me = () => blendAthlete(learner(blend.prev()), learner(store.get()), blend.t());
   return {
     serving: () => learner(store.get()).serve !== null,
-    player: () => ({ athlete: learner(store.get()), time: simOf(store.get()).time }),
+    player: () => ({ athlete: me(), time: time() }),
     opponent: () => {
-      const g = store.get().game;
-      return g.kind === "match"
-        ? { athlete: athleteOf(g.play, OPPONENT_ID), time: g.play.sim.time }
+      const them = opponentOf(store.get());
+      return them
+        ? { athlete: blendAthlete(opponentOf(blend.prev()), them, blend.t()), time: time() }
         : { athlete: learner(store.get()), time: 0 };
     },
     assist: () => {
@@ -245,12 +277,11 @@ function sceneViews(store: Store, explain: ExplainStore, lesson: Lesson, intro: 
     },
     camera: () => {
       const st = store.get();
-      const a = learner(st);
-      const sim = simOf(st);
+      const a = me();
       return {
         at: a.motion.position,
         end: a.end,
-        ball: sim.live ? sim.ball.position : null,
+        ball: simOf(st).live ? drawnBall(blend, st) : null,
         focus:
           intro() && lesson.feature ? featureShape(court, lesson.feature).label : focusOf(explain),
       };
@@ -301,7 +332,8 @@ function LessonGame({
   const [isPaused] = useState(
     () => () => gate.held() || uiHeld() || explain.get().showing !== null,
   );
-  const [views] = useState(() => sceneViews(store, explain, lesson, gate.held));
+  const [blend] = useState(() => createBlend(store.get()));
+  const [views] = useState(() => sceneViews(store, explain, lesson, gate.held, blend));
   const [hud] = useState(() =>
     createHud<Hud>({
       progress: 0,
@@ -358,7 +390,14 @@ function LessonGame({
         <ServeLine visible={views.serving} />
         <Player view={views.player} />
         {isMatch && <Player view={views.opponent} trim={OPPONENT_TRIM} />}
-        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} hud={hud} />
+        <Loop
+          store={store}
+          pad={pad}
+          explain={explain}
+          isPaused={isPaused}
+          hud={hud}
+          blend={blend}
+        />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
         <Chases hud={hud} />

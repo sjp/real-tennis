@@ -37,6 +37,15 @@ import { hear } from "../audio/engine.ts";
 import { length } from "../sim/vec.ts";
 import { cameraStart, describeEvent, describeNotice, panel, hudPanel, DPR, FPS } from "./view.ts";
 import { FpsMeter, FpsProbe } from "./Fps.tsx";
+import {
+  BALL_JUMP,
+  blendAthlete,
+  blendTime,
+  blendVec,
+  createBlend,
+  STEP_FIRST,
+  type Blend,
+} from "./blend.ts";
 import { Player } from "./Player.tsx";
 import { settings, useSettings } from "./settings.ts";
 
@@ -78,6 +87,7 @@ const Loop = memo(function Loop({
   explain,
   isPaused,
   hud,
+  blend,
 }: {
   store: Store;
   pad: Touch;
@@ -85,10 +95,12 @@ const Loop = memo(function Loop({
   /** Play is frozen, e.g. while the Marker explains. */
   isPaused: () => boolean;
   hud: HudStore<Hud>;
+  /** Where the views draw from: the state before the latest step, and how far past it. */
+  blend: Blend<PracticeState>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ prev: store.get().sim.ball.position, acc: 0, paused: false });
+  const loop = useRef({ acc: 0, paused: false });
 
   useEffect(
     () => () => {
@@ -110,7 +122,7 @@ const Loop = memo(function Loop({
     l.acc += Math.min(delta, 0.1);
     while (l.acc >= STEP && !isPaused()) {
       const before = store.get();
-      l.prev = before.sim.ball.position;
+      blend.stepping(before);
       const r = practiceStep(world, before, input, settings.get().autoHit);
       hear(r.events, length(before.sim.ball.velocity), () => before.shot);
       store.set(r.state);
@@ -130,12 +142,11 @@ const Loop = memo(function Loop({
         if (text) hud.set({ event: text });
       }
     }
-    // The ball, between the last two steps.
-    const a = l.prev;
-    const b = store.get().sim.ball.position;
-    const t = l.acc / STEP;
-    ball.current?.position.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
-  });
+    blend.at(l.acc / STEP);
+    const at = drawnBall(blend, store.get());
+    ball.current?.position.set(at.x, at.y, at.z);
+    // Before anything draws from the state this frame.
+  }, STEP_FIRST);
 
   return (
     <mesh ref={ball}>
@@ -213,18 +224,31 @@ function PracticeTouch({
   );
 }
 
-/** The scene's views of the game, made once so the scene can skip re-rendering. */
-function sceneViews(store: Store, explain: ExplainStore) {
+/** The ball as drawn, between the last two steps. */
+const drawnBall = (blend: Blend<PracticeState>, s: PracticeState) =>
+  blendVec(blend.prev().sim.ball.position, s.sim.ball.position, blend.t(), BALL_JUMP);
+
+/**
+ * The scene's views of the game, made once so the scene can skip re-rendering.
+ * The figure and the camera are drawn between steps; the hit assist predicts
+ * from the stepped state, as the game does.
+ */
+function sceneViews(store: Store, explain: ExplainStore, blend: Blend<PracticeState>) {
+  const drawn = () => blendAthlete(blend.prev(), store.get(), blend.t());
   return {
     serving: () => store.get().serve !== null,
-    player: () => ({ athlete: store.get(), time: store.get().sim.time }),
+    player: () => {
+      const s = store.get();
+      return { athlete: drawn(), time: blendTime(blend.prev().sim.time, s.sim.time, blend.t()) };
+    },
     assist: () => store.get(),
     camera: () => {
       const s = store.get();
+      const me = drawn();
       return {
-        at: s.motion.position,
-        end: s.end,
-        ball: s.sim.live ? s.sim.ball.position : null,
+        at: me.motion.position,
+        end: me.end,
+        ball: s.sim.live ? drawnBall(blend, s) : null,
         focus: focusOf(explain),
       };
     },
@@ -241,7 +265,8 @@ export function Practice() {
   const touchShown = useTouchShown();
   const held = ui.held;
   const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
-  const [views] = useState(() => sceneViews(store, explain));
+  const [blend] = useState(() => createBlend(store.get()));
+  const [views] = useState(() => sceneViews(store, explain, blend));
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud] = useState(() =>
     createHud<Hud>({ choice: choice(store.get()), last: null, calls: [], event: null }),
@@ -281,7 +306,14 @@ export function Practice() {
         {FPS && <FpsProbe />}
         <ServeLine visible={views.serving} />
         <Player view={views.player} />
-        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} hud={hud} />
+        <Loop
+          store={store}
+          pad={pad}
+          explain={explain}
+          isPaused={isPaused}
+          hud={hud}
+          blend={blend}
+        />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
         <AssistRings view={views.assist} on={assist} />

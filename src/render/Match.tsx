@@ -51,6 +51,15 @@ import {
   FPS,
 } from "./view.ts";
 import { FpsMeter, FpsProbe } from "./Fps.tsx";
+import {
+  BALL_JUMP,
+  blendAthlete,
+  blendTime,
+  blendVec,
+  createBlend,
+  STEP_FIRST,
+  type Blend,
+} from "./blend.ts";
 
 const world = createWorld(court);
 const OPPONENT_ID = "opponent";
@@ -124,6 +133,7 @@ const Loop = memo(function Loop({
   explain,
   isPaused,
   hud,
+  blend,
 }: {
   game: Store;
   pad: Touch;
@@ -132,10 +142,12 @@ const Loop = memo(function Loop({
   /** Play is frozen, e.g. while the Marker explains. */
   isPaused: () => boolean;
   hud: HudStore<Hud>;
+  /** Where the views draw from: the state before the latest step, and how far past it. */
+  blend: Blend<PlayState>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ prev: game.get().play.sim.ball.position, acc: 0, paused: false });
+  const loop = useRef({ acc: 0, paused: false });
 
   useEffect(
     () => () => {
@@ -157,7 +169,7 @@ const Loop = memo(function Loop({
     l.acc += Math.min(delta, 0.1);
     while (l.acc >= STEP && !isPaused()) {
       const { play: before, memory, rests, strokes: struck } = game.get();
-      l.prev = before.sim.ball.position;
+      blend.stepping(before);
       const view = {
         me: athleteOf(before, OPPONENT_ID),
         sim: before.sim,
@@ -205,11 +217,11 @@ const Loop = memo(function Loop({
           ...chasesOf(r.state.match),
         });
     }
-    const a = l.prev;
-    const b = game.get().play.sim.ball.position;
-    const t = l.acc / STEP;
-    ball.current?.position.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
-  });
+    blend.at(l.acc / STEP);
+    const at = drawnBall(blend, game.get().play);
+    ball.current?.position.set(at.x, at.y, at.z);
+    // Before anything draws from the state this frame.
+  }, STEP_FIRST);
 
   return (
     <mesh ref={ball}>
@@ -269,24 +281,40 @@ function MatchTouch({
   return <TouchControls touch={pad} athlete={human(game)} onPause={onPause} />;
 }
 
-/** The scene's views of the match, made once so the scene can skip re-rendering. */
-function sceneViews(game: Store, explain: ExplainStore) {
-  const time = () => game.get().play.sim.time;
+/** The ball as drawn, between the last two steps. */
+const drawnBall = (blend: Blend<PlayState>, play: PlayState) =>
+  blendVec(blend.prev().sim.ball.position, play.sim.ball.position, blend.t(), BALL_JUMP);
+
+/**
+ * The scene's views of the match, made once so the scene can skip re-rendering.
+ * The figures and the camera are drawn between steps; the hit assist predicts
+ * from the stepped state, as the game does.
+ */
+function sceneViews(game: Store, explain: ExplainStore, blend: Blend<PlayState>) {
+  const drawn = (id: string) => {
+    const prev = blend.prev();
+    const t = blend.t();
+    const play = game.get().play;
+    return {
+      athlete: blendAthlete(athleteOf(prev, id), athleteOf(play, id), t),
+      time: blendTime(prev.sim.time, play.sim.time, t),
+    };
+  };
   return {
     serving: () => human(game).serve !== null,
-    player: () => ({ athlete: human(game), time: time() }),
-    opponent: () => ({ athlete: athleteOf(game.get().play, OPPONENT_ID), time: time() }),
+    player: () => drawn(PLAYER_ID),
+    opponent: () => drawn(OPPONENT_ID),
     assist: () => {
       const me = human(game);
       return { sim: game.get().play.sim, motion: me.motion, end: me.end };
     },
     camera: () => {
-      const sim = game.get().play.sim;
-      const me = human(game);
+      const play = game.get().play;
+      const me = drawn(PLAYER_ID).athlete;
       return {
         at: me.motion.position,
         end: me.end,
-        ball: sim.live ? sim.ball.position : null,
+        ball: play.sim.live ? drawnBall(blend, play) : null,
         focus: focusOf(explain),
       };
     },
@@ -316,7 +344,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const touchShown = useTouchShown();
   const held = ui.held;
   const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
-  const [views] = useState(() => sceneViews(game, explain));
+  const [blend] = useState(() => createBlend(game.get().play));
+  const [views] = useState(() => sceneViews(game, explain, blend));
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud] = useState(() =>
     createHud<Hud>({
@@ -353,6 +382,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           explain={explain}
           isPaused={isPaused}
           hud={hud}
+          blend={blend}
         />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
