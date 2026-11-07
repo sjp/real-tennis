@@ -30,6 +30,7 @@ import {
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { Summary } from "./Summary.tsx";
+import { Scoreboard, type Side } from "./Scoreboard.tsx";
 import { decided, strokesIn, type Rest } from "../game/summary.ts";
 import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
@@ -65,6 +66,11 @@ const world = createWorld(court);
 const OPPONENT_ID = "opponent";
 const LABELS: Labels = { [PLAYER_ID]: "Player", [OPPONENT_ID]: "Opponent" };
 const OPPONENT_TRIM = "#b5443c";
+/** The scoreboard's rows, in the players' colours lightened to read on the dark HUD. */
+const SIDES: readonly [Side, Side] = [
+  { id: PLAYER_ID, label: "Player", color: "#8ab8ff" },
+  { id: OPPONENT_ID, label: "Opponent", color: "#ff9b8f" },
+];
 
 interface Game {
   readonly play: PlayState;
@@ -92,7 +98,9 @@ function createStore(game: Game): Store {
 }
 
 interface Hud {
-  readonly score: string;
+  readonly match: MatchState;
+  /** The Marker's call of the score. */
+  readonly call: string;
   readonly choice: string;
   readonly last: string | null;
   /** The Marker's latest calls. */
@@ -114,15 +122,6 @@ function chasesOf(m: MatchState): Pick<Hud, "chases" | "playingOff"> {
   return m.playOff.length > 0
     ? { chases: m.playOff, playingOff: true }
     : { chases: m.chases, playingOff: false };
-}
-
-/** Games and sets so far, e.g. "Games 2–1 · Sets 0–0" (the player first). */
-function tally(p: PlayState): string {
-  const m = p.match;
-  const pair = (t: typeof m.games) => `${String(t[PLAYER_ID] ?? 0)}–${String(t[OPPONENT_ID] ?? 0)}`;
-  return m.config.sets === 1
-    ? `Games ${pair(m.games)}`
-    : `Games ${pair(m.games)} · Sets ${pair(m.sets)}`;
 }
 
 /** Steps the match at a fixed rate, with the AI playing the opponent. */
@@ -212,7 +211,8 @@ const Loop = memo(function Loop({
         }));
       if (before.match !== r.state.match)
         hud.set({
-          score: `${callScore(r.state.match, LABELS)} · ${tally(r.state)}`,
+          match: r.state.match,
+          call: callScore(r.state.match, LABELS),
           over: r.state.phase === "over",
           ...chasesOf(r.state.match),
         });
@@ -241,7 +241,8 @@ function MatchHud({ hud }: { hud: HudStore<Hud> }) {
   const h = useHud(hud, (h) => h);
   return (
     <div style={hudPanel}>
-      <div style={{ color: "#ffffff", fontWeight: "bold" }}>{h.score}</div>
+      <Scoreboard match={h.match} sides={SIDES} />
+      <div style={{ color: "#ffffff", margin: "4px 0 2px" }}>{h.call}</div>
       {h.chases.length > 0 && (
         <div style={{ color: "#f28482" }}>
           {h.playingOff ? "Playing for: " : "Chases: "}
@@ -349,7 +350,8 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud] = useState(() =>
     createHud<Hud>({
-      score: `${callScore(start.state.match, LABELS)} · ${tally(start.state)}`,
+      match: start.state.match,
+      call: callScore(start.state.match, LABELS),
       choice: choice(human(game)),
       last: null,
       calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),

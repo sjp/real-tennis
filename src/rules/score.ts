@@ -68,3 +68,13 @@ export function callScore(m: MatchState, labels: Labels): string {
   parts.push(...[...m.playOff, ...m.chases].map(callChase));
   return parts.map((p, i) => (i === 0 ? p : p.charAt(0).toLowerCase() + p.slice(1))).join(", ");
 }
+
+const SHOWN = ["0", "15", "30", "40"];
+
+/** A player's points as a scoreboard shows them: "0", "15", "30", "40" or "Adv". */
+export function pointsShown(m: MatchState, p: PlayerId): string {
+  const a = m.points[p] ?? 0;
+  const b = m.points[opponentOf(m, p)] ?? 0;
+  if (a >= 3 && b >= 3) return a > b ? "Adv" : "40";
+  return SHOWN[a]!;
+}

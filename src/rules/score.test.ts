@@ -3,7 +3,7 @@ import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { playRest, startMatch, type MatchState } from "./match.ts";
 import type { RallyOutcome } from "./rally.ts";
-import { callChase, callScore } from "./score.ts";
+import { callChase, callScore, pointsShown } from "./score.ts";
 
 const H = "human";
 const AI = "ai";
@@ -67,5 +67,29 @@ describe("callChase", () => {
     expect(callChase(chaseName(court, { side: "hazard", distance: 1 }))).toMatch(
       /^chase .*hazard.*from the service line\)$/,
     );
+  });
+});
+
+describe("pointsShown", () => {
+  const shown = (...winners: string[]) => {
+    const m = after(winners.map(win));
+    return [pointsShown(m, H), pointsShown(m, AI)];
+  };
+
+  it("shows love, fifteen, thirty and forty as numbers", () => {
+    expect(shown()).toEqual(["0", "0"]);
+    expect(shown(H)).toEqual(["15", "0"]);
+    expect(shown(H, H, AI)).toEqual(["30", "15"]);
+    expect(shown(H, H, H)).toEqual(["40", "0"]);
+  });
+
+  it("shows deuce as forty all and the advantage as Adv", () => {
+    expect(shown(H, H, H, AI, AI, AI)).toEqual(["40", "40"]);
+    expect(shown(H, H, H, AI, AI, AI, AI)).toEqual(["40", "Adv"]);
+    expect(shown(H, H, H, AI, AI, AI, AI, H)).toEqual(["40", "40"]);
+  });
+
+  it("starts again from love after a game", () => {
+    expect(shown(H, H, H, H)).toEqual(["0", "0"]);
   });
 });
