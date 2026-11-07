@@ -29,18 +29,18 @@ off in Settings or the pause menu to time every swing yourself.
 
 ### Keyboard
 
-| Key              | Action                                    |
-| ---------------- | ----------------------------------------- |
-| W A S D / arrows | Move (always at a sprint)                 |
-| Space            | Swing (when serving: toss, then swing)    |
-| 1 – 4            | Shot: 1 drive, 2 cut, 3 lob, 4 boast      |
-| 1 – 8            | Serve style, while serving                |
-| H                | Hit assist on/off                         |
-| M                | Court markings on/off                     |
-| X                | Rule explanations on/off                  |
-| ?                | Rules reference                           |
-| Esc              | Pause (or close the rules)                |
-| Space / Enter    | Dismiss an explanation, or start a lesson |
+| Key              | Action                                                     |
+| ---------------- | ---------------------------------------------------------- |
+| W A S D / arrows | Move (always at a sprint)                                  |
+| Space            | Swing (when serving: toss, then swing)                     |
+| 1 – 4            | Shot: 1 drive, 2 cut, 3 lob, 4 boast                       |
+| 1 – 8            | Serve style, while serving                                 |
+| H                | Hit assist on/off                                          |
+| M                | Court markings on/off                                      |
+| X                | Rule explanations on/off                                   |
+| ?                | Rules reference                                            |
+| Esc              | Pause (or close the rules)                                 |
+| Space / Enter    | Dismiss an explanation or a rest result, or start a lesson |
 
 In **Practice** there are also:
 
