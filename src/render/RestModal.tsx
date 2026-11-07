@@ -6,10 +6,12 @@ import { panel } from "./view.ts";
 
 /** Taps and Space this soon after it opens are a late swing, not a dismissal. */
 const GRACE_MS = 400;
+/** How long it shows, with play frozen, unless dismissed. */
+const SHOW_MS = 5000;
 
 /**
  * Who won the rest and the score after it (160), over the court. It closes
- * when the Marker's pause ends, or sooner on a tap, click or Space.
+ * after `SHOW_MS`, or sooner on a tap, click or Space.
  */
 export function RestModal({
   result,
@@ -29,7 +31,9 @@ export function RestModal({
       if (performance.now() - opened.current >= GRACE_MS) onDismiss();
     };
     window.addEventListener("keydown", down);
+    const timer = setTimeout(onDismiss, SHOW_MS);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("keydown", down);
     };
   }, [result, onDismiss]);

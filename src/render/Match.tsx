@@ -304,7 +304,7 @@ const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
   return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
 });
 
-/** The result modal, while the Marker's pause lasts. */
+/** The result modal; play is frozen while it shows. */
 function Result({ hud, skip }: { hud: HudStore<Hud>; skip: Skip }) {
   const result = useHud(hud, (h) => h.result);
   const [dismiss] = useState(() => () => {
@@ -393,7 +393,6 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
   const held = ui.held;
-  const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
   const [blend] = useState(() => createBlend(game.get().play));
   const [views] = useState(() => sceneViews(game, explain, blend));
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
@@ -411,6 +410,10 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     }),
   );
   const over = useHud(hud, (h) => h.over);
+  // Frozen while the Marker explains or the result shows.
+  const [isPaused] = useState(
+    () => () => held() || explain.get().showing !== null || hud.get().result !== null,
+  );
   const [skip] = useState(createSkip);
 
   const me = human(game);
