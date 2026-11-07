@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import {
   CanvasTexture,
   CatmullRomCurve3,
@@ -182,7 +182,13 @@ function Sleeve({ shirt, trim }: { shirt: MeshStandardMaterial; trim: MeshStanda
 /** What the figure is drawn from, read every frame. */
 export type PlayerView = () => { readonly athlete: Athlete; readonly time: number };
 
-export function Player({ view, trim = TRIM }: { view: PlayerView; trim?: string }) {
+export const Player = memo(function Player({
+  view,
+  trim = TRIM,
+}: {
+  view: PlayerView;
+  trim?: string;
+}) {
   const body = useRef<Group>(null);
   const arm = useRef<Group>(null);
   const free = useRef<Group>(null);
@@ -453,4 +459,4 @@ export function Player({ view, trim = TRIM }: { view: PlayerView; trim?: string 
       </group>
     </group>
   );
-}
+});

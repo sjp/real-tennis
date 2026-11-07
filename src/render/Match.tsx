@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Mesh } from "three";
 import { aiInput, FRESH, type AiMemory } from "../ai/ai.ts";
 import { AI_PRESETS, type AiLevel } from "../ai/presets.ts";
@@ -31,6 +31,7 @@ import { ChaseMarkers, Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { Summary } from "./Summary.tsx";
 import { decided, strokesIn, type Rest } from "../game/summary.ts";
+import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
@@ -94,8 +95,6 @@ interface Hud {
   readonly playingOff: boolean;
 }
 
-type HudChange = Partial<Hud> | ((old: Hud) => Partial<Hud>);
-
 const human = (store: Store): Athlete => athleteOf(store.get().play, PLAYER_ID);
 
 function choice(a: Athlete): string {
@@ -118,13 +117,13 @@ function tally(p: PlayState): string {
 }
 
 /** Steps the match at a fixed rate, with the AI playing the opponent. */
-function Loop({
+const Loop = memo(function Loop({
   game,
   pad,
   level,
   explain,
   isPaused,
-  onHud,
+  hud,
 }: {
   game: Store;
   pad: Touch;
@@ -132,7 +131,7 @@ function Loop({
   explain: ExplainStore;
   /** Play is frozen, e.g. while the Marker explains. */
   isPaused: () => boolean;
-  onHud: (h: HudChange) => void;
+  hud: HudStore<Hud>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
@@ -188,19 +187,19 @@ function Loop({
 
       const was = athleteOf(before, PLAYER_ID);
       const now = athleteOf(r.state, PLAYER_ID);
-      if (choice(was) !== choice(now)) onHud({ choice: choice(now) });
-      for (const n of r.notices) if (n.player === PLAYER_ID) onHud(describeNotice(n.notice));
+      if (choice(was) !== choice(now)) hud.set({ choice: choice(now) });
+      for (const n of r.notices) if (n.player === PLAYER_ID) hud.set(describeNotice(n.notice));
       for (const e of r.events) {
         const text = describeEvent(e);
-        if (text) onHud({ event: text });
+        if (text) hud.set({ event: text });
       }
       explainCalls(explain, r.calls, r.state.phase !== "play" || r.state.rally.striker === null);
       if (r.calls.length > 0)
-        onHud((h) => ({
+        hud.set((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-4),
         }));
       if (before.match !== r.state.match)
-        onHud({
+        hud.set({
           score: `${callScore(r.state.match, LABELS)} · ${tally(r.state)}`,
           over: r.state.phase === "over",
           ...chasesOf(r.state.match),
@@ -218,13 +217,81 @@ function Loop({
       <meshStandardMaterial color="#f5f0e1" />
     </mesh>
   );
-}
+});
 
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: pause",
 ];
+
+function MatchHud({ hud }: { hud: HudStore<Hud> }) {
+  const h = useHud(hud, (h) => h);
+  return (
+    <div style={hudPanel}>
+      <div style={{ color: "#ffffff", fontWeight: "bold" }}>{h.score}</div>
+      {h.chases.length > 0 && (
+        <div style={{ color: "#f28482" }}>
+          {h.playingOff ? "Playing for: " : "Chases: "}
+          {h.chases.map((c) => c.name).join(" · ")}
+        </div>
+      )}
+      <div>{h.choice}</div>
+      {h.last && <div>{h.last}</div>}
+      {h.event && <div style={{ color: "#4cc9f0" }}>{h.event}</div>}
+      {h.calls.map((c, i) => (
+        <div key={i} style={{ color: "#ffd166" }}>
+          {c}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
+  return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
+});
+
+/** The touch controls, re-reading the player's choices whenever the HUD changes. */
+function MatchTouch({
+  hud,
+  game,
+  pad,
+  onPause,
+}: {
+  hud: HudStore<Hud>;
+  game: Store;
+  pad: Touch;
+  onPause: () => void;
+}) {
+  // The player's choices change along with the HUD, so re-read them on every update.
+  useHud(hud, (h) => h);
+  return <TouchControls touch={pad} athlete={human(game)} onPause={onPause} />;
+}
+
+/** The scene's views of the match, made once so the scene can skip re-rendering. */
+function sceneViews(game: Store, explain: ExplainStore) {
+  const time = () => game.get().play.sim.time;
+  return {
+    serving: () => human(game).serve !== null,
+    player: () => ({ athlete: human(game), time: time() }),
+    opponent: () => ({ athlete: athleteOf(game.get().play, OPPONENT_ID), time: time() }),
+    assist: () => {
+      const me = human(game);
+      return { sim: game.get().play.sim, motion: me.motion, end: me.end };
+    },
+    camera: () => {
+      const sim = game.get().play.sim;
+      const me = human(game);
+      return {
+        at: me.motion.position,
+        end: me.end,
+        ball: sim.live ? sim.ball.position : null,
+        focus: focusOf(explain),
+      };
+    },
+  };
+}
 
 function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const [start] = useState(() => {
@@ -247,20 +314,22 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const ui = usePlayUi(explain);
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
-  const isPaused = () => ui.held() || explain.get().showing !== null;
+  const held = ui.held;
+  const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
+  const [views] = useState(() => sceneViews(game, explain));
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
-  const [hud, setHud] = useState<Hud>(() => ({
-    score: `${callScore(start.state.match, LABELS)} · ${tally(start.state)}`,
-    choice: choice(human(game)),
-    last: null,
-    calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),
-    event: null,
-    over: false,
-    ...chasesOf(start.state.match),
-  }));
-  const onHud = (h: HudChange) => {
-    setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
-  };
+  const [hud] = useState(() =>
+    createHud<Hud>({
+      score: `${callScore(start.state.match, LABELS)} · ${tally(start.state)}`,
+      choice: choice(human(game)),
+      last: null,
+      calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),
+      event: null,
+      over: false,
+      ...chasesOf(start.state.match),
+    }),
+  );
+  const over = useHud(hud, (h) => h.over);
 
   const me = human(game);
   const { assist } = useSettings();
@@ -274,65 +343,25 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         <Court court={court} />
         <Ears />
         {FPS && <FpsProbe />}
-        <ServeLine visible={() => human(game).serve !== null} />
-        <Player view={() => ({ athlete: human(game), time: game.get().play.sim.time })} />
-        <Player
-          view={() => ({
-            athlete: athleteOf(game.get().play, OPPONENT_ID),
-            time: game.get().play.sim.time,
-          })}
-          trim={OPPONENT_TRIM}
-        />
+        <ServeLine visible={views.serving} />
+        <Player view={views.player} />
+        <Player view={views.opponent} trim={OPPONENT_TRIM} />
         <Loop
           game={game}
           pad={pad}
           level={setup.level}
           explain={explain}
           isPaused={isPaused}
-          onHud={onHud}
+          hud={hud}
         />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
-        <ChaseMarkers chases={hud.chases} />
-        <AssistRings
-          view={() => ({
-            sim: game.get().play.sim,
-            motion: human(game).motion,
-            end: human(game).end,
-          })}
-          on={assist}
-        />
-        <FollowCamera
-          target={() => {
-            const sim = game.get().play.sim;
-            const me = human(game);
-            return {
-              at: me.motion.position,
-              end: me.end,
-              ball: sim.live ? sim.ball.position : null,
-              focus: focusOf(explain),
-            };
-          }}
-        />
+        <Chases hud={hud} />
+        <AssistRings view={views.assist} on={assist} />
+        <FollowCamera target={views.camera} />
       </Canvas>
       {FPS && <FpsMeter />}
-      <div style={hudPanel}>
-        <div style={{ color: "#ffffff", fontWeight: "bold" }}>{hud.score}</div>
-        {hud.chases.length > 0 && (
-          <div style={{ color: "#f28482" }}>
-            {hud.playingOff ? "Playing for: " : "Chases: "}
-            {hud.chases.map((c) => c.name).join(" · ")}
-          </div>
-        )}
-        <div>{hud.choice}</div>
-        {hud.last && <div>{hud.last}</div>}
-        {hud.event && <div style={{ color: "#4cc9f0" }}>{hud.event}</div>}
-        {hud.calls.map((c, i) => (
-          <div key={i} style={{ color: "#ffd166" }}>
-            {c}
-          </div>
-        ))}
-      </div>
+      <MatchHud hud={hud} />
       {ex.showing && (
         <ExplainPanel
           id={ex.showing}
@@ -345,7 +374,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         />
       )}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
-      {hud.over && (
+      {over && (
         <Summary
           match={game.get().play.match}
           rests={game.get().rests}
@@ -358,10 +387,11 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         !ui.menu &&
         !ui.rules &&
         !ex.showing &&
-        !hud.over && (
-          <TouchControls
-            touch={pad}
-            athlete={me}
+        !over && (
+          <MatchTouch
+            hud={hud}
+            game={game}
+            pad={pad}
             onPause={() => {
               ui.setMenu(true);
             }}

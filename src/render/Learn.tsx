@@ -1,9 +1,11 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Mesh } from "three";
+import type { ChaseCall } from "../court/chase.ts";
 import { featureShape } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf } from "../game/play.ts";
+import type { MatchState } from "../rules/match.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
 import { useTouchShown } from "./inputMode.ts";
@@ -27,6 +29,7 @@ import { ChaseMarkers, Markings } from "./markings.tsx";
 import { Player } from "./Player.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { loadDone, saveDone } from "./progress.ts";
+import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
 import { settings, useSettings } from "./settings.ts";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
@@ -75,21 +78,38 @@ interface Hud {
   readonly choice: string;
   readonly last: string | null;
   readonly calls: readonly string[];
+  /** In a match lesson, chases laid, or being played off. */
+  readonly chases: readonly ChaseCall[];
+  readonly playingOff: boolean;
+}
+
+const matchOf = (s: LessonState): MatchState | null =>
+  s.game.kind === "match" ? s.game.play.match : null;
+
+/** One empty list, so a drill's HUD updates leave the chase markers alone. */
+const NO_CHASES: readonly ChaseCall[] = [];
+
+function chasesOf(s: LessonState): Pick<Hud, "chases" | "playingOff"> {
+  const m = matchOf(s);
+  if (!m) return { chases: NO_CHASES, playingOff: false };
+  return m.playOff.length > 0
+    ? { chases: m.playOff, playingOff: true }
+    : { chases: m.chases, playingOff: false };
 }
 
 /** Steps the lesson at a fixed rate. */
-function Loop({
+const Loop = memo(function Loop({
   store,
   pad,
   explain,
   isPaused,
-  onHud,
+  hud,
 }: {
   store: Store;
   pad: Touch;
   explain: ExplainStore;
   isPaused: () => boolean;
-  onHud: (h: (old: Hud) => Partial<Hud>) => void;
+  hud: HudStore<Hud>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
@@ -129,14 +149,16 @@ function Loop({
         r.scored ||
         r.calls.length > 0 ||
         notices.length > 0 ||
-        choice(before) !== choice(r.state)
+        choice(before) !== choice(r.state) ||
+        matchOf(before) !== matchOf(r.state)
       )
-        onHud((h) => ({
+        hud.set((h) => ({
           progress: r.state.progress,
           done: r.state.done,
           choice: choice(r.state),
           last: notices.at(-1)?.last ?? h.last,
           calls: [...h.calls, ...r.calls.map((c) => c.message)].slice(-3),
+          ...chasesOf(r.state),
         }));
     }
     const a = l.prev;
@@ -151,13 +173,101 @@ function Loop({
       <meshStandardMaterial color="#f5f0e1" />
     </mesh>
   );
-}
+});
 
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing (serving: toss, then swing)",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "H: hit assist · M: court markings · X: explanations on/off · ?: rules · Esc: pause",
 ];
+
+function LessonHud({ hud, lesson }: { hud: HudStore<Hud>; lesson: Lesson }) {
+  const h = useHud(hud, (h) => h);
+  return (
+    <div style={hudPanel}>
+      <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
+      <div style={{ color: HIGHLIGHT }}>
+        {lesson.goal}: {Math.min(h.progress, lesson.count)} / {lesson.count}
+      </div>
+      {h.chases.length > 0 && (
+        <div style={{ color: "#f28482" }}>
+          {h.playingOff ? "Playing for: " : "Chases: "}
+          {h.chases.map((c) => c.name).join(" · ")}
+        </div>
+      )}
+      <div>{h.choice}</div>
+      {h.last && <div>{h.last}</div>}
+      {h.calls.map((c, i) => (
+        <div key={i} style={{ color: "#ffd166" }}>
+          {c}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
+  return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
+});
+
+/** The touch controls, re-reading the player's choices whenever the HUD changes. */
+function LessonTouch({
+  hud,
+  store,
+  pad,
+  onPause,
+}: {
+  hud: HudStore<Hud>;
+  store: Store;
+  pad: Touch;
+  onPause: () => void;
+}) {
+  // The player's choices change along with the HUD, so re-read them on every update.
+  useHud(hud, (h) => h);
+  return <TouchControls touch={pad} athlete={learner(store.get())} onPause={onPause} />;
+}
+
+/** The scene's views of the lesson, made once so the scene can skip re-rendering. */
+function sceneViews(store: Store, explain: ExplainStore, lesson: Lesson, intro: () => boolean) {
+  return {
+    serving: () => learner(store.get()).serve !== null,
+    player: () => ({ athlete: learner(store.get()), time: simOf(store.get()).time }),
+    opponent: () => {
+      const g = store.get().game;
+      return g.kind === "match"
+        ? { athlete: athleteOf(g.play, OPPONENT_ID), time: g.play.sim.time }
+        : { athlete: learner(store.get()), time: 0 };
+    },
+    assist: () => {
+      const st = store.get();
+      const a = learner(st);
+      return { sim: simOf(st), motion: a.motion, end: a.end };
+    },
+    camera: () => {
+      const st = store.get();
+      const a = learner(st);
+      const sim = simOf(st);
+      return {
+        at: a.motion.position,
+        end: a.end,
+        ball: sim.live ? sim.ball.position : null,
+        focus:
+          intro() && lesson.feature ? featureShape(court, lesson.feature).label : focusOf(explain),
+      };
+    },
+  };
+}
+
+/** Shut until released, e.g. by starting from the intro. */
+function createGate() {
+  let held = true;
+  return {
+    held: () => held,
+    release: () => {
+      held = false;
+    },
+  };
+}
 
 function LessonGame({
   lesson,
@@ -185,31 +295,37 @@ function LessonGame({
   const ui = usePlayUi(explain);
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
-  const held = useRef({ intro: true });
-  const isPaused = () => held.current.intro || ui.held() || explain.get().showing !== null;
-  const [hud, setHud] = useState<Hud>(() => ({
-    progress: 0,
-    done: false,
-    choice: choice(store.get()),
-    last: null,
-    calls: [],
-  }));
-  const onHud = (h: (old: Hud) => Partial<Hud>) => {
-    setHud((old) => ({ ...old, ...h(old) }));
-  };
+  // Holds play during the intro; read by the loop and the camera.
+  const [gate] = useState(createGate);
+  const uiHeld = ui.held;
+  const [isPaused] = useState(
+    () => () => gate.held() || uiHeld() || explain.get().showing !== null,
+  );
+  const [views] = useState(() => sceneViews(store, explain, lesson, gate.held));
+  const [hud] = useState(() =>
+    createHud<Hud>({
+      progress: 0,
+      done: false,
+      choice: choice(store.get()),
+      last: null,
+      calls: [],
+      ...chasesOf(store.get()),
+    }),
+  );
+  const done = useHud(hud, (h) => h.done);
 
   useEffect(() => {
-    if (hud.done) onDone();
-  }, [hud.done, onDone]);
+    if (done) onDone();
+  }, [done, onDone]);
 
   useEffect(() => {
     const begin = () => {
-      held.current.intro = false;
+      gate.release();
       setIntro(false);
     };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (held.current.intro && (e.code === "Space" || e.code === "Enter")) {
+      if (gate.held() && (e.code === "Space" || e.code === "Enter")) {
         e.preventDefault();
         begin();
       }
@@ -218,7 +334,7 @@ function LessonGame({
     return () => {
       window.removeEventListener("keydown", down);
     };
-  }, []);
+  }, [gate]);
 
   const s = store.get();
   const me = learner(s);
@@ -229,9 +345,6 @@ function LessonGame({
       : undefined;
   const isMatch = s.game.kind === "match";
   const { assist } = useSettings();
-  // Re-read on each HUD update, which follows every call.
-  const m = s.game.kind === "match" ? s.game.play.match : null;
-  const chases = m ? (m.playOff.length > 0 ? m.playOff : m.chases) : [];
   return (
     <>
       <Canvas dpr={DPR} camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
@@ -242,77 +355,28 @@ function LessonGame({
         <Court court={court} />
         <Ears />
         {FPS && <FpsProbe />}
-        <ServeLine visible={() => learner(store.get()).serve !== null} />
-        <Player view={() => ({ athlete: learner(store.get()), time: simOf(store.get()).time })} />
-        {isMatch && (
-          <Player
-            view={() => {
-              const g = store.get().game;
-              return g.kind === "match"
-                ? { athlete: athleteOf(g.play, OPPONENT_ID), time: g.play.sim.time }
-                : { athlete: learner(store.get()), time: 0 };
-            }}
-            trim={OPPONENT_TRIM}
-          />
-        )}
-        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />
+        <ServeLine visible={views.serving} />
+        <Player view={views.player} />
+        {isMatch && <Player view={views.opponent} trim={OPPONENT_TRIM} />}
+        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} hud={hud} />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
-        <ChaseMarkers chases={chases} />
-        <AssistRings
-          view={() => {
-            const st = store.get();
-            const a = learner(st);
-            return { sim: simOf(st), motion: a.motion, end: a.end };
-          }}
-          on={assist}
-        />
-        <FollowCamera
-          target={() => {
-            const st = store.get();
-            const a = learner(st);
-            const sim = simOf(st);
-            return {
-              at: a.motion.position,
-              end: a.end,
-              ball: sim.live ? sim.ball.position : null,
-              focus:
-                held.current.intro && lesson.feature
-                  ? featureShape(court, lesson.feature).label
-                  : focusOf(explain),
-            };
-          }}
-        />
+        <Chases hud={hud} />
+        <AssistRings view={views.assist} on={assist} />
+        <FollowCamera target={views.camera} />
       </Canvas>
       {FPS && <FpsMeter />}
-      <div style={hudPanel}>
-        <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
-        <div style={{ color: HIGHLIGHT }}>
-          {lesson.goal}: {Math.min(hud.progress, lesson.count)} / {lesson.count}
-        </div>
-        {chases.length > 0 && (
-          <div style={{ color: "#f28482" }}>
-            {m!.playOff.length > 0 ? "Playing for: " : "Chases: "}
-            {chases.map((c) => c.name).join(" · ")}
-          </div>
-        )}
-        <div>{hud.choice}</div>
-        {hud.last && <div>{hud.last}</div>}
-        {hud.calls.map((c, i) => (
-          <div key={i} style={{ color: "#ffd166" }}>
-            {c}
-          </div>
-        ))}
-      </div>
+      <LessonHud hud={hud} lesson={lesson} />
       {touchShown ? (
         !intro &&
-        !hud.done &&
+        !done &&
         !ui.menu &&
         !ui.rules &&
         !ex.showing && (
-          <TouchControls
-            touch={pad}
-            athlete={me}
+          <LessonTouch
+            hud={hud}
+            store={store}
+            pad={pad}
             onPause={() => {
               ui.setMenu(true);
             }}
@@ -336,7 +400,7 @@ function LessonGame({
           <div style={{ color: HIGHLIGHT, margin: "8px 0" }}>Goal: {lesson.goal}</div>
           <button
             onClick={() => {
-              held.current.intro = false;
+              gate.release();
               setIntro(false);
             }}
           >
@@ -344,7 +408,7 @@ function LessonGame({
           </button>
         </Centred>
       )}
-      {hud.done && (
+      {done && (
         <Centred>
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>Lesson complete</div>
           <p style={{ margin: "0 0 12px" }}>{lesson.success}</p>

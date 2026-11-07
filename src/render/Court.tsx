@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { BufferGeometry, DoubleSide, Float32BufferAttribute } from "three";
 import { polygonGeometry } from "./geometry.ts";
 import { serviceLineZ, faultLineX } from "../court/classify.ts";
@@ -57,7 +57,7 @@ function floorLines(court: CourtDefinition): Stripe[] {
   ];
 }
 
-export function Court({ court }: { court: CourtDefinition }) {
+export const Court = memo(function Court({ court }: { court: CourtDefinition }) {
   const { surfaces, sensors, net, lines } = useMemo(() => {
     const prims = collisionGeometry(court);
     const bySurface = new Map<string, { vertices: readonly Vec3[]; normal: Vec3 }[]>();
@@ -109,4 +109,4 @@ export function Court({ court }: { court: CourtDefinition }) {
       </mesh>
     </group>
   );
-}
+});

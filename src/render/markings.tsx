@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ChaseCall } from "../court/chase.ts";
 import { markZ, type CourtFeature } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
@@ -30,7 +31,7 @@ const FEATURES: readonly { feature: CourtFeature; colour: string }[] = [
  * The court markings overlay (070): openings, the Service Court and the pass,
  * the tambour, and every chase line with its name and distance.
  */
-export function Markings() {
+export const Markings = memo(function Markings() {
   return (
     <group>
       {FEATURES.map(({ feature, colour }) => (
@@ -51,10 +52,14 @@ export function Markings() {
         ))}
     </group>
   );
-}
+});
 
 /** Chases waiting to be played for, marked where they fell. */
-export function ChaseMarkers({ chases }: { chases: readonly ChaseCall[] }) {
+export const ChaseMarkers = memo(function ChaseMarkers({
+  chases,
+}: {
+  chases: readonly ChaseCall[];
+}) {
   return (
     <group>
       {chases.map((c, i) => {
@@ -76,4 +81,4 @@ export function ChaseMarkers({ chases }: { chases: readonly ChaseCall[] }) {
       })}
     </group>
   );
-}
+});

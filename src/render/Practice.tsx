@@ -1,5 +1,5 @@
 import { useFrame, Canvas } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import {
@@ -28,6 +28,7 @@ import {
 } from "./explainStore.ts";
 import { Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
+import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { Court } from "./Court.tsx";
@@ -62,8 +63,6 @@ function choice(s: PracticeState): string {
   return s.serve !== null ? `Serve: ${SERVE_STYLES[s.serveStyle]!.name}` : `Shot: ${s.shot}`;
 }
 
-type HudChange = Partial<Hud> | ((old: Hud) => Partial<Hud>);
-
 interface Hud {
   readonly choice: string;
   readonly last: string | null;
@@ -73,19 +72,19 @@ interface Hud {
 }
 
 /** Steps the game at a fixed rate, and draws the ball between steps. */
-function Loop({
+const Loop = memo(function Loop({
   store,
   pad,
   explain,
   isPaused,
-  onHud,
+  hud,
 }: {
   store: Store;
   pad: Touch;
   explain: ExplainStore;
   /** Play is frozen, e.g. while the Marker explains. */
   isPaused: () => boolean;
-  onHud: (h: HudChange) => void;
+  hud: HudStore<Hud>;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
@@ -118,17 +117,17 @@ function Loop({
       input = { ...input, swing: false, select: null };
       l.acc -= STEP;
       if (before.shot !== r.state.shot || before.serveStyle !== r.state.serveStyle)
-        onHud({ choice: choice(r.state) });
-      for (const n of r.notices) onHud(describeNotice(n));
+        hud.set({ choice: choice(r.state) });
+      for (const n of r.notices) hud.set(describeNotice(n));
       const rally = r.state.rally;
       explainCalls(explain, r.calls, rally?.outcome !== null || rally.striker === null);
       if (r.calls.length > 0)
-        onHud((h) => ({
+        hud.set((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-3),
         }));
       for (const e of r.events) {
         const text = describeEvent(e);
-        if (text) onHud({ event: text });
+        if (text) hud.set({ event: text });
       }
     }
     // The ball, between the last two steps.
@@ -144,7 +143,7 @@ function Loop({
       <meshStandardMaterial color="#f5f0e1" />
     </mesh>
   );
-}
+});
 
 const HELP = [
   "WASD / arrows: move · Shift: sprint · Space: swing",
@@ -167,6 +166,71 @@ const COMMANDS: readonly Command[] = [
   { code: "KeyE", label: "Ends", run: (s) => changeEnds(court, s) },
 ];
 
+function PracticeHud({ hud }: { hud: HudStore<Hud> }) {
+  const h = useHud(hud, (h) => h);
+  return (
+    <div style={hudPanel}>
+      <div>{h.choice}</div>
+      {h.last && <div>{h.last}</div>}
+      {h.event && <div style={{ color: "#4cc9f0" }}>{h.event}</div>}
+      {h.calls.map((c, i) => (
+        <div key={i} style={{ color: "#ffd166" }}>
+          {c}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The touch controls, re-reading the player's choices whenever the HUD changes. */
+function PracticeTouch({
+  hud,
+  store,
+  pad,
+  command,
+  onPause,
+}: {
+  hud: HudStore<Hud>;
+  store: Store;
+  pad: Touch;
+  command: (c: Command) => void;
+  onPause: () => void;
+}) {
+  // The player's choices change along with the HUD, so re-read them on every update.
+  useHud(hud, (h) => h);
+  return (
+    <TouchControls
+      touch={pad}
+      athlete={store.get()}
+      extras={COMMANDS.map((c) => ({
+        label: c.label,
+        onPress: () => {
+          command(c);
+        },
+      }))}
+      onPause={onPause}
+    />
+  );
+}
+
+/** The scene's views of the game, made once so the scene can skip re-rendering. */
+function sceneViews(store: Store, explain: ExplainStore) {
+  return {
+    serving: () => store.get().serve !== null,
+    player: () => ({ athlete: store.get(), time: store.get().sim.time }),
+    assist: () => store.get(),
+    camera: () => {
+      const s = store.get();
+      return {
+        at: s.motion.position,
+        end: s.end,
+        ball: s.sim.live ? s.sim.ball.position : null,
+        focus: focusOf(explain),
+      };
+    },
+  };
+}
+
 /** Solo practice: move, hit, and serve, with no opponent. */
 export function Practice() {
   const [store] = useState(createStore);
@@ -176,23 +240,18 @@ export function Practice() {
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
   const held = ui.held;
-  const isPaused = () => ui.held() || explain.get().showing !== null;
+  const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
+  const [views] = useState(() => sceneViews(store, explain));
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
-  const [hud, setHud] = useState<Hud>(() => ({
-    choice: choice(store.get()),
-    last: null,
-    calls: [],
-    event: null,
-  }));
-  const onHud = (h: HudChange) => {
-    setHud((old) => ({ ...old, ...(typeof h === "function" ? h(old) : h) }));
-  };
+  const [hud] = useState(() =>
+    createHud<Hud>({ choice: choice(store.get()), last: null, calls: [], event: null }),
+  );
 
   const [command] = useState(() => (c: Command) => {
     // No feeds while paused, or while the Marker explains.
     if (held() || explain.get().showing) return;
     store.set(c.run(store.get()));
-    setHud((h) => ({ ...h, choice: choice(store.get()), calls: [], event: null }));
+    hud.set({ choice: choice(store.get()), calls: [], event: null });
   });
 
   useEffect(() => {
@@ -220,48 +279,25 @@ export function Practice() {
         <Court court={court} />
         <Ears />
         {FPS && <FpsProbe />}
-        <ServeLine visible={() => store.get().serve !== null} />
-        <Player view={() => ({ athlete: store.get(), time: store.get().sim.time })} />
-        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} onHud={onHud} />
+        <ServeLine visible={views.serving} />
+        <Player view={views.player} />
+        <Loop store={store} pad={pad} explain={explain} isPaused={isPaused} hud={hud} />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
-        <AssistRings view={() => store.get()} on={assist} />
-        <FollowCamera
-          target={() => {
-            const s = store.get();
-            return {
-              at: s.motion.position,
-              end: s.end,
-              ball: s.sim.live ? s.sim.ball.position : null,
-              focus: focusOf(explain),
-            };
-          }}
-        />
+        <AssistRings view={views.assist} on={assist} />
+        <FollowCamera target={views.camera} />
       </Canvas>
       {FPS && <FpsMeter />}
-      <div style={hudPanel}>
-        <div>{hud.choice}</div>
-        {hud.last && <div>{hud.last}</div>}
-        {hud.event && <div style={{ color: "#4cc9f0" }}>{hud.event}</div>}
-        {hud.calls.map((c, i) => (
-          <div key={i} style={{ color: "#ffd166" }}>
-            {c}
-          </div>
-        ))}
-      </div>
+      <PracticeHud hud={hud} />
       {touchShown ? (
         !ui.menu &&
         !ui.rules &&
         !ex.showing && (
-          <TouchControls
-            touch={pad}
-            athlete={s}
-            extras={COMMANDS.map((c) => ({
-              label: c.label,
-              onPress: () => {
-                command(c);
-              },
-            }))}
+          <PracticeTouch
+            hud={hud}
+            store={store}
+            pad={pad}
+            command={command}
             onPause={() => {
               ui.setMenu(true);
             }}

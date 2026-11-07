@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { CanvasTexture, DoubleSide, SRGBColorSpace, type MeshBasicMaterial } from "three";
 import { featureName, featureShape, type CourtFeature } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
@@ -11,7 +11,7 @@ import { polygonGeometry } from "./geometry.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
 
 /** A court feature, glowing, with its name. */
-export function Highlight({
+export const Highlight = memo(function Highlight({
   feature,
   colour = HIGHLIGHT,
   pulse = true,
@@ -53,7 +53,7 @@ export function Highlight({
       )}
     </group>
   );
-}
+});
 
 /** Text that always faces the camera, at a fixed size on screen, and shows through walls. */
 export function Label({

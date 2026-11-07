@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { Vector3, type Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { FloorPoint, Side, Vec3 } from "../court/types.ts";
@@ -49,7 +49,7 @@ function cameraHeight(z: number): number {
  * seen through, like the view from the dedans. Swings round on a change of
  * ends. Given a `focus`, it leaves the player to look at that from mid-court.
  */
-export function FollowCamera({
+export const FollowCamera = memo(function FollowCamera({
   target,
 }: {
   target: () => { at: FloorPoint; end: Side; ball: Vec3 | null; focus?: Vec3 | null };
@@ -96,10 +96,10 @@ export function FollowCamera({
     camera.lookAt(look.current);
   });
   return null;
-}
+});
 
 /** Hears from the camera: keeps the audio's listener where the camera is. */
-export function Ears() {
+export const Ears = memo(function Ears() {
   const camera = useThree((s) => s.camera);
   useFrame(() => {
     const right = new Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -110,14 +110,14 @@ export function Ears() {
     };
   });
   return null;
-}
+});
 
 /**
  * The hit-assist rings: where the ball next bounces, and where the player can
  * first reach it. Predicts only while shown, and afresh only when the ball
  * changes course (`planAssist`).
  */
-export function AssistRings({
+export const AssistRings = memo(function AssistRings({
   view,
   on,
 }: {
@@ -156,10 +156,10 @@ export function AssistRings({
       </mesh>
     </>
   );
-}
+});
 
 /** The Second Gallery line, lit up while serving (Law 8.1(d)(i)). */
-export function ServeLine({ visible }: { visible: () => boolean }) {
+export const ServeLine = memo(function ServeLine({ visible }: { visible: () => boolean }) {
   const mesh = useRef<Mesh>(null);
   useFrame(() => {
     if (mesh.current) mesh.current.visible = visible();
@@ -174,4 +174,4 @@ export function ServeLine({ visible }: { visible: () => boolean }) {
       <meshBasicMaterial color="#ff5d5d" />
     </mesh>
   );
-}
+});
