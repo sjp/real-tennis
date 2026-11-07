@@ -157,7 +157,7 @@ const Loop = memo(function Loop({
 });
 
 const HELP = [
-  "WASD / arrows: move · Shift: sprint · Space: swing",
+  "WASD / arrows: move · Space: swing",
   "1 drive · 2 cut · 3 lob · 4 boast (serving: 1–8 serve style)",
   "R: drop feed · F: machine feed · Q: serve · E: change ends · H: hit assist",
   "M: court markings · X: explanations on/off · ?: rules · Esc: pause",

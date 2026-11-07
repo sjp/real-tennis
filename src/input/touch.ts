@@ -2,8 +2,6 @@ import { clampMove, type InputState } from "./input.ts";
 
 /** The joystick's reach, in CSS pixels. ⚠ verify on a phone. */
 export const STICK_RADIUS = 56;
-/** Pushed this far past the rim (as a fraction of the reach), the player sprints. */
-export const SPRINT_PAST = 1.35;
 
 export interface Stick {
   /** Where the thumb landed: the joystick's centre. */
@@ -14,7 +12,7 @@ export interface Stick {
 
 /**
  * Touch input (080): a floating joystick where the left thumb lands, and
- * buttons. The screen feeds it pointer positions; the game reads it like
+ * buttons. The player always sprints (170). The screen feeds it pointer positions; the game reads it like
  * the keyboard.
  */
 export interface Touch {
@@ -25,7 +23,6 @@ export interface Touch {
   readonly stick: () => Stick | null;
   readonly swing: () => void;
   readonly select: (n: number) => void;
-  readonly sprint: (held: boolean) => void;
   /** The current input. Presses since the last read count once. */
   readonly read: () => InputState;
 }
@@ -35,7 +32,6 @@ export function touch(): Touch {
   let stick: Stick | null = null;
   let swing = false;
   let select: number | null = null;
-  let sprint = false;
 
   return {
     stickStart(pointer, x, y) {
@@ -57,20 +53,15 @@ export function touch(): Touch {
     select(n) {
       select = n;
     },
-    sprint(held) {
-      sprint = held;
-    },
     read() {
       let move = { x: 0, y: 0 };
-      let far = false;
       if (stick) {
         const dx = (stick.at.x - stick.origin.x) / STICK_RADIUS;
         // Screen y runs down; forwards is up.
         const dy = (stick.origin.y - stick.at.y) / STICK_RADIUS;
         move = clampMove(dx, dy);
-        far = Math.hypot(dx, dy) >= SPRINT_PAST;
       }
-      const input: InputState = { move, sprint: sprint || far, swing, select };
+      const input: InputState = { move, sprint: true, swing, select };
       swing = false;
       select = null;
       return input;

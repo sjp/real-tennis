@@ -4,9 +4,8 @@ export type Controls = "keys" | "touch";
 /** Phrases that name controls, written into teaching text as `{name}`. */
 export const PHRASES: Readonly<Record<string, Readonly<Record<Controls, string>>>> = {
   move: {
-    keys: "Move with WASD or the arrow keys, and hold Shift to sprint.",
-    touch:
-      "Move with your thumb on the left of the screen. Push past the rim, or hold Sprint, to sprint.",
+    keys: "Move with WASD or the arrow keys.",
+    touch: "Move with your thumb on the left of the screen.",
   },
   swing: { keys: "Press Space", touch: "Tap Swing" },
   again: { keys: "press Space again", touch: "tap Swing again" },

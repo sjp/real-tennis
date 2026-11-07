@@ -78,7 +78,7 @@ export interface Extra {
 
 /**
  * The touch controls (080): a joystick wherever the left thumb lands, and
- * on the right Swing, Sprint and the shots. While serving, one button cycles
+ * on the right Swing and the shots. While serving, one button cycles
  * the serve styles.
  */
 export function TouchControls({
@@ -95,7 +95,6 @@ export function TouchControls({
   onPause: () => void;
 }) {
   const [stick, setStick] = useState<Stick | null>(null);
-  const [sprinting, setSprinting] = useState(false);
   const thumb = (e: PointerEvent, f: (id: number, x: number, y: number) => void) => {
     f(e.pointerId, e.clientX, e.clientY);
     setStick(touch.stick());
@@ -176,27 +175,6 @@ export function TouchControls({
         >
           {serving ? "Toss / Swing" : "Swing"}
         </Press>
-        <Press
-          style={{
-            ...round,
-            right: 132,
-            bottom: 24,
-            width: 64,
-            height: 64,
-            fontSize: 12,
-            borderColor: sprinting ? HIGHLIGHT : (round.border as string),
-          }}
-          onPress={() => {
-            touch.sprint(true);
-            setSprinting(true);
-          }}
-          onRelease={() => {
-            touch.sprint(false);
-            setSprinting(false);
-          }}
-        >
-          Sprint
-        </Press>
         <div
           style={{
             position: "absolute",
@@ -266,8 +244,8 @@ function Joystick({ stick }: { stick: Stick }) {
   const dx = stick.at.x - stick.origin.x;
   const dy = stick.at.y - stick.origin.y;
   const d = Math.hypot(dx, dy);
-  // The knob stops a little past the rim, where sprinting starts.
-  const k = d > STICK_RADIUS * 1.4 ? (STICK_RADIUS * 1.4) / d : 1;
+  // The knob stops at the rim.
+  const k = d > STICK_RADIUS ? STICK_RADIUS / d : 1;
   const base = STICK_RADIUS * 2;
   return (
     <>

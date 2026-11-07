@@ -31,8 +31,7 @@ off in Settings or the pause menu to time every swing yourself.
 
 | Key              | Action                                    |
 | ---------------- | ----------------------------------------- |
-| W A S D / arrows | Move                                      |
-| Shift            | Sprint                                    |
+| W A S D / arrows | Move (always at a sprint)                 |
 | Space            | Swing (when serving: toss, then swing)    |
 | 1 – 4            | Shot: 1 drive, 2 cut, 3 lob, 4 boast      |
 | 1 – 8            | Serve style, while serving                |
@@ -54,9 +53,8 @@ In **Practice** there are also:
 
 ### Touch
 
-- **Left thumb**: put it anywhere for a joystick. Push past the rim to sprint.
-- **Right side**: Swing (Toss / Swing when serving), Sprint, and the shot
-  buttons. While serving, one button cycles the serve styles.
+- **Left thumb**: put it anywhere for a joystick. The player always sprints.
+- **Right side**: Swing (Toss / Swing when serving) and the shot buttons. While serving, one button cycles the serve styles.
 - In Practice, extra buttons work the ball machine.
 
 ## Development

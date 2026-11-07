@@ -48,7 +48,8 @@ export function assist(
     const p = prediction.path[i]!;
     if (p.z * f > 0 || p.y < LOW || p.y > HIGH) continue;
     const gap = Math.hypot(p.x - x, p.z - z) - REACH;
-    if (gap <= standardPlayer.runSpeed * t) intercept = p;
+    // The player always sprints (170).
+    if (gap <= standardPlayer.sprintSpeed * t) intercept = p;
   }
   return { bounce: bounce?.position ?? null, intercept };
 }

@@ -4,7 +4,6 @@ const LEFT = ["KeyA", "ArrowLeft"];
 const RIGHT = ["KeyD", "ArrowRight"];
 const UP = ["KeyW", "ArrowUp"];
 const DOWN = ["KeyS", "ArrowDown"];
-const SPRINT = ["ShiftLeft", "ShiftRight"];
 
 export interface Keyboard {
   /** The current input. Presses since the last read count once. */
@@ -12,7 +11,7 @@ export interface Keyboard {
   dispose(): void;
 }
 
-/** WASD/arrows to move, Space to swing, Shift to sprint, 1–8 to pick a shot. */
+/** WASD/arrows to move (always sprinting, 170), Space to swing, 1–8 to pick a shot. */
 export function keyboard(target: Window = window): Keyboard {
   const held = new Set<string>();
   let swing = false;
@@ -45,7 +44,7 @@ export function keyboard(target: Window = window): Keyboard {
     read() {
       const input: InputState = {
         move: clampMove(axis(LEFT, RIGHT), axis(DOWN, UP)),
-        sprint: any(SPRINT),
+        sprint: true,
         swing,
         select,
       };
