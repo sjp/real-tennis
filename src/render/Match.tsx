@@ -4,7 +4,8 @@ import type { Mesh } from "three";
 import { aiInput, FRESH, type AiMemory } from "../ai/ai.ts";
 import { AI_PRESETS, type AiLevel } from "../ai/presets.ts";
 import { standardCourt as court } from "../court/standard.ts";
-import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts";
+import { athleteOf, CALL_PAUSE, playStep, startPlay, type PlayState } from "../game/play.ts";
+import { restResult, type RestResult } from "../game/result.ts";
 import { playerCapsule, type Athlete } from "../game/player.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
@@ -30,6 +31,7 @@ import {
 import { ChaseMarkers, Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { Summary } from "./Summary.tsx";
+import { RestModal } from "./RestModal.tsx";
 import { Scoreboard, type Side } from "./Scoreboard.tsx";
 import { decided, strokesIn, type Rest } from "../game/summary.ts";
 import { createHud, useHud, type HudStore } from "./hud.ts";
@@ -101,6 +103,8 @@ interface Hud {
   readonly match: MatchState;
   /** The Marker's call of the score. */
   readonly call: string;
+  /** The rest just decided, shown until the Marker's pause ends (160). */
+  readonly result: RestResult | null;
   readonly choice: string;
   readonly last: string | null;
   /** The Marker's latest calls. */
@@ -110,6 +114,27 @@ interface Hud {
   /** Chases laid, or being played off. */
   readonly chases: readonly ChaseCall[];
   readonly playingOff: boolean;
+}
+
+/** A request, from the result modal, to end the Marker's pause now. */
+interface Skip {
+  request(): void;
+  /** Whether one was made since the last call. */
+  take(): boolean;
+}
+
+function createSkip(): Skip {
+  let requested = false;
+  return {
+    request: () => {
+      requested = true;
+    },
+    take: () => {
+      const r = requested;
+      requested = false;
+      return r;
+    },
+  };
 }
 
 const human = (store: Store): Athlete => athleteOf(store.get().play, PLAYER_ID);
@@ -133,6 +158,7 @@ const Loop = memo(function Loop({
   isPaused,
   hud,
   blend,
+  skip,
 }: {
   game: Store;
   pad: Touch;
@@ -143,6 +169,8 @@ const Loop = memo(function Loop({
   hud: HudStore<Hud>;
   /** Where the views draw from: the state before the latest step, and how far past it. */
   blend: Blend<PlayState>;
+  /** The result modal was dismissed: end the Marker's pause now. */
+  skip: Skip;
 }) {
   const ball = useRef<Mesh>(null);
   const keys = useMemo(() => keyboard(), []);
@@ -164,6 +192,13 @@ const Loop = memo(function Loop({
       l.paused = paused;
       l.acc = 0;
       return;
+    }
+    if (skip.take()) {
+      // The key that dismissed the result isn't a swing.
+      input = { ...input, swing: false };
+      const g = game.get();
+      if (g.play.phase === "called")
+        game.set({ ...g, play: { ...g.play, since: g.play.sim.time - CALL_PAUSE } });
     }
     l.acc += Math.min(delta, 0.1);
     while (l.acc >= STEP && !isPaused()) {
@@ -204,7 +239,11 @@ const Loop = memo(function Loop({
         const text = describeEvent(e);
         if (text) hud.set({ event: text });
       }
-      explainCalls(explain, r.calls, r.state.phase !== "play" || r.state.rally.striker === null);
+      if (rest) hud.set({ result: restResult(r.state.match, rest.outcome, r.calls, LABELS) });
+      else if (r.state.phase !== "called" && hud.get().result) hud.set({ result: null });
+      // Explanations wait for the result to close.
+      const quiet = r.state.phase !== "play" || r.state.rally.striker === null;
+      explainCalls(explain, r.calls, quiet && hud.get().result === null);
       if (r.calls.length > 0)
         hud.set((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-4),
@@ -264,6 +303,16 @@ function MatchHud({ hud }: { hud: HudStore<Hud> }) {
 const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
   return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
 });
+
+/** The result modal, while the Marker's pause lasts. */
+function Result({ hud, skip }: { hud: HudStore<Hud>; skip: Skip }) {
+  const result = useHud(hud, (h) => h.result);
+  const [dismiss] = useState(() => () => {
+    skip.request();
+    hud.set({ result: null });
+  });
+  return result && <RestModal result={result} sides={SIDES} onDismiss={dismiss} />;
+}
 
 /** The touch controls, re-reading the player's choices whenever the HUD changes. */
 function MatchTouch({
@@ -352,6 +401,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     createHud<Hud>({
       match: start.state.match,
       call: callScore(start.state.match, LABELS),
+      result: null,
       choice: choice(human(game)),
       last: null,
       calls: start.calls.map((c) => `${c.message} (Law ${c.law})`),
@@ -361,6 +411,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     }),
   );
   const over = useHud(hud, (h) => h.over);
+  const [skip] = useState(createSkip);
 
   const me = human(game);
   const { assist } = useSettings();
@@ -385,6 +436,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           isPaused={isPaused}
           hud={hud}
           blend={blend}
+          skip={skip}
         />
         {feature && <Highlight feature={feature} />}
         {ui.markings && <Markings />}
@@ -405,6 +457,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           }}
         />
       )}
+      {!ui.menu && !ui.rules && !over && <Result hud={hud} skip={skip} />}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
       {over && (
         <Summary
