@@ -56,7 +56,7 @@ In **Practice** there are also:
 - **Left thumb**: put it anywhere for a joystick. The player always sprints.
 - **Right side**: Swing (Toss / Swing when serving) and the shot buttons. While serving, one button cycles the serve styles.
 - In Practice, extra buttons work the ball machine.
-- To keep the court clear, the HUD shows only the score, chases and the lesson goal. The Marker's calls and shot feedback are keyboard-only.
+- To keep the court clear on touch, or in any window under 700px wide or 500px tall, the HUD shows only the score, chases and the lesson goal, and the keyboard help is hidden.
 
 ## Development
 
