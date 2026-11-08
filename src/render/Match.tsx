@@ -278,6 +278,8 @@ const HELP = [
 
 function MatchHud({ hud }: { hud: HudStore<Hud> }) {
   const h = useHud(hud, (h) => h);
+  // On a phone, only the score and chases: the rest covers the court.
+  const full = !useTouchShown();
   return (
     <div style={hudPanel}>
       <Scoreboard match={h.match} sides={SIDES} />
@@ -288,14 +290,18 @@ function MatchHud({ hud }: { hud: HudStore<Hud> }) {
           {h.chases.map((c) => c.name).join(" · ")}
         </div>
       )}
-      <div>{h.choice}</div>
-      {h.last && <div>{h.last}</div>}
-      {h.event && <div style={{ color: "#4cc9f0" }}>{h.event}</div>}
-      {h.calls.map((c, i) => (
-        <div key={i} style={{ color: "#ffd166" }}>
-          {c}
-        </div>
-      ))}
+      {full && (
+        <>
+          <div>{h.choice}</div>
+          {h.last && <div>{h.last}</div>}
+          {h.event && <div style={{ color: "#4cc9f0" }}>{h.event}</div>}
+          {h.calls.map((c, i) => (
+            <div key={i} style={{ color: "#ffd166" }}>
+              {c}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

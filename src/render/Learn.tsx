@@ -195,6 +195,8 @@ const HELP = [
 
 function LessonHud({ hud, lesson }: { hud: HudStore<Hud>; lesson: Lesson }) {
   const h = useHud(hud, (h) => h);
+  // On a phone, only the lesson and chases: the rest covers the court.
+  const full = !useTouchShown();
   return (
     <div style={hudPanel}>
       <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
@@ -207,13 +209,17 @@ function LessonHud({ hud, lesson }: { hud: HudStore<Hud>; lesson: Lesson }) {
           {h.chases.map((c) => c.name).join(" · ")}
         </div>
       )}
-      <div>{h.choice}</div>
-      {h.last && <div>{h.last}</div>}
-      {h.calls.map((c, i) => (
-        <div key={i} style={{ color: "#ffd166" }}>
-          {c}
-        </div>
-      ))}
+      {full && (
+        <>
+          <div>{h.choice}</div>
+          {h.last && <div>{h.last}</div>}
+          {h.calls.map((c, i) => (
+            <div key={i} style={{ color: "#ffd166" }}>
+              {c}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

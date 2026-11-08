@@ -179,6 +179,8 @@ const COMMANDS: readonly Command[] = [
 
 function PracticeHud({ hud }: { hud: HudStore<Hud> }) {
   const h = useHud(hud, (h) => h);
+  // On a phone, nothing: it covers the court.
+  if (useTouchShown()) return null;
   return (
     <div style={hudPanel}>
       <div>{h.choice}</div>
