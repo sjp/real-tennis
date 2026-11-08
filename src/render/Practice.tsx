@@ -13,7 +13,7 @@ import {
 } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
-import { useTouchShown } from "./inputMode.ts";
+import { useCompact, useTouchShown } from "./inputMode.ts";
 import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { createWorld, STEP } from "../sim/world.ts";
@@ -179,8 +179,8 @@ const COMMANDS: readonly Command[] = [
 
 function PracticeHud({ hud }: { hud: HudStore<Hud> }) {
   const h = useHud(hud, (h) => h);
-  // On a phone, nothing: it covers the court.
-  if (useTouchShown()) return null;
+  // On a phone or small window, nothing: it covers the court.
+  if (useCompact()) return null;
   return (
     <div style={hudPanel}>
       <div>{h.choice}</div>
@@ -265,6 +265,7 @@ export function Practice() {
   const ui = usePlayUi(explain);
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
+  const compact = useCompact();
   const held = ui.held;
   const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
   const [blend] = useState(() => createBlend(store.get()));
@@ -323,30 +324,30 @@ export function Practice() {
       </Canvas>
       {FPS && <FpsMeter />}
       <PracticeHud hud={hud} />
-      {touchShown ? (
-        !ui.menu &&
-        !ui.rules &&
-        !ex.showing && (
-          <PracticeTouch
-            hud={hud}
-            store={store}
-            pad={pad}
-            command={command}
-            onPause={() => {
-              ui.setMenu(true);
-            }}
-          />
-        )
-      ) : (
-        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-          {HELP.map((h) => (
-            <div key={h}>{h}</div>
-          ))}
-          <div>
-            Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
-          </div>
-        </div>
-      )}
+      {touchShown
+        ? !ui.menu &&
+          !ui.rules &&
+          !ex.showing && (
+            <PracticeTouch
+              hud={hud}
+              store={store}
+              pad={pad}
+              command={command}
+              onPause={() => {
+                ui.setMenu(true);
+              }}
+            />
+          )
+        : !compact && (
+            <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+              {HELP.map((h) => (
+                <div key={h}>{h}</div>
+              ))}
+              <div>
+                Hit assist: {assist ? "on" : "off"} · Explanations: {ex.on ? "on" : "off"}
+              </div>
+            </div>
+          )}
       <PauseMenu
         ui={ui}
         explain={explain}

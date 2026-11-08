@@ -41,3 +41,19 @@ export function useTouchShown(): boolean {
   const last = useSyncExternalStore(subscribe, () => touched);
   return mode === "on" || (mode === "auto" && last);
 }
+
+/** A phone-sized window. */
+const SMALL = "(max-width: 700px), (max-height: 500px)";
+const small = "matchMedia" in globalThis ? matchMedia(SMALL) : null;
+
+const subscribeSmall = (l: () => void) => {
+  small?.addEventListener("change", l);
+  return () => small?.removeEventListener("change", l);
+};
+
+/** Whether to keep the HUD light: on touch, or in a phone-sized window. */
+export function useCompact(): boolean {
+  const touchShown = useTouchShown();
+  const isSmall = useSyncExternalStore(subscribeSmall, () => small?.matches ?? false);
+  return touchShown || isSmall;
+}

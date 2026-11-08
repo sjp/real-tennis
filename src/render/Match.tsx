@@ -10,7 +10,7 @@ import { playerCapsule, type Athlete } from "../game/player.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
-import { useTouchShown } from "./inputMode.ts";
+import { useCompact, useTouchShown } from "./inputMode.ts";
 import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
@@ -278,8 +278,8 @@ const HELP = [
 
 function MatchHud({ hud }: { hud: HudStore<Hud> }) {
   const h = useHud(hud, (h) => h);
-  // On a phone, only the score and chases: the rest covers the court.
-  const full = !useTouchShown();
+  // On a phone or small window, only the score and chases: the rest covers the court.
+  const full = !useCompact();
   return (
     <div style={hudPanel}>
       <Scoreboard match={h.match} sides={SIDES} />
@@ -398,6 +398,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const ui = usePlayUi(explain);
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
+  const compact = useCompact();
   const held = ui.held;
   const [blend] = useState(() => createBlend(game.get().play));
   const [views] = useState(() => sceneViews(game, explain, blend));
@@ -477,31 +478,31 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           onNew={onQuit}
         />
       )}
-      {touchShown ? (
-        !ui.menu &&
-        !ui.rules &&
-        !ex.showing &&
-        !over && (
-          <MatchTouch
-            hud={hud}
-            game={game}
-            pad={pad}
-            onPause={() => {
-              ui.setMenu(true);
-            }}
-          />
-        )
-      ) : (
-        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-          {HELP.map((h) => (
-            <div key={h}>{h}</div>
-          ))}
-          <div>
-            Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
-            {ex.on ? "on" : "off"}
-          </div>
-        </div>
-      )}
+      {touchShown
+        ? !ui.menu &&
+          !ui.rules &&
+          !ex.showing &&
+          !over && (
+            <MatchTouch
+              hud={hud}
+              game={game}
+              pad={pad}
+              onPause={() => {
+                ui.setMenu(true);
+              }}
+            />
+          )
+        : !compact && (
+            <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+              {HELP.map((h) => (
+                <div key={h}>{h}</div>
+              ))}
+              <div>
+                Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
+                {ex.on ? "on" : "off"}
+              </div>
+            </div>
+          )}
     </>
   );
 }

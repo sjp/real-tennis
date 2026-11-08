@@ -8,7 +8,7 @@ import { athleteOf } from "../game/play.ts";
 import type { MatchState } from "../rules/match.ts";
 import { keyboard } from "../input/keyboard.ts";
 import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
-import { useTouchShown } from "./inputMode.ts";
+import { useCompact, useTouchShown } from "./inputMode.ts";
 import { TouchControls } from "./TouchControls.tsx";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { createWorld, STEP, type SimState } from "../sim/world.ts";
@@ -195,8 +195,8 @@ const HELP = [
 
 function LessonHud({ hud, lesson }: { hud: HudStore<Hud>; lesson: Lesson }) {
   const h = useHud(hud, (h) => h);
-  // On a phone, only the lesson and chases: the rest covers the court.
-  const full = !useTouchShown();
+  // On a phone or small window, only the lesson and chases: the rest covers the court.
+  const full = !useCompact();
   return (
     <div style={hudPanel}>
       <div style={{ color: "#ffffff", fontWeight: "bold" }}>{lesson.title}</div>
@@ -332,6 +332,7 @@ function LessonGame({
   const ui = usePlayUi(explain);
   const [pad] = useState(createTouch);
   const touchShown = useTouchShown();
+  const compact = useCompact();
   // Holds play during the intro; read by the loop and the camera.
   const [gate] = useState(createGate);
   const uiHeld = ui.held;
@@ -412,28 +413,28 @@ function LessonGame({
       </Canvas>
       {FPS && <FpsMeter />}
       <LessonHud hud={hud} lesson={lesson} />
-      {touchShown ? (
-        !intro &&
-        !done &&
-        !ui.menu &&
-        !ui.rules &&
-        !ex.showing && (
-          <LessonTouch
-            hud={hud}
-            store={store}
-            pad={pad}
-            onPause={() => {
-              ui.setMenu(true);
-            }}
-          />
-        )
-      ) : (
-        <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-          {HELP.map((h) => (
-            <div key={h}>{h}</div>
-          ))}
-        </div>
-      )}
+      {touchShown
+        ? !intro &&
+          !done &&
+          !ui.menu &&
+          !ui.rules &&
+          !ex.showing && (
+            <LessonTouch
+              hud={hud}
+              store={store}
+              pad={pad}
+              onPause={() => {
+                ui.setMenu(true);
+              }}
+            />
+          )
+        : !compact && (
+            <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+              {HELP.map((h) => (
+                <div key={h}>{h}</div>
+              ))}
+            </div>
+          )}
       {intro && (
         <Centred>
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>{lesson.title}</div>
