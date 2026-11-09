@@ -231,6 +231,43 @@ describe("service (Law 8.1(d))", () => {
   it("ignores the toss before the service is struck", () => {
     expect(outcome([bounce(hw - 2, -4), ...goodService])).toBeNull();
   });
+
+  it.each([
+    ["into the net", net("hazard")],
+    ["dead on the floor without a bounce", simple("restOnFloor", hl - 1)],
+  ] as const)(
+    "faults off the Service Penthouse %s: it didn't drop in the Service Court (Law 8.1(d)(viii))",
+    (_, e) => {
+      expect(outcome([...goodService.slice(0, 4), e])).toEqual({
+        kind: "fault",
+        reason: "faultDrop",
+      });
+    },
+  );
+
+  // The game only reports these before the service is struck: on the line at
+  // the strike, or the toss falling to the floor unstruck.
+  const line = { type: "serverFault", reason: "line" } as const;
+  const missed = { type: "serverFault", reason: "missed" } as const;
+
+  it("faults a server's fault reported while the service is still in the air", () => {
+    expect(outcome([...goodService.slice(0, 2), line])).toEqual({
+      kind: "fault",
+      reason: "faultLine",
+    });
+    expect(outcome([...goodService.slice(0, 4), missed])).toEqual({
+      kind: "fault",
+      reason: "faultMissed",
+    });
+  });
+
+  it("ignores a server's fault reported once the service has dropped or been volleyed", () => {
+    expect(play([...goodService, line, missed])).toEqual({
+      outcome: null,
+      teaching: ["goodService"],
+    });
+    expect(outcome([...goodService.slice(0, 4), hit(R, 2), line])).toBeNull();
+  });
 });
 
 describe("winning the rest (Law 11.1(b))", () => {
