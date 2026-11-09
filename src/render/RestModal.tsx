@@ -1,11 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { RestResult } from "../game/result.ts";
 import { callScore, type Labels } from "../rules/score.ts";
+import { useDismissKeys } from "./dismissKeys.ts";
 import { Scoreboard, type Side } from "./Scoreboard.tsx";
 import { panel } from "./view.ts";
 
-/** Taps and Space this soon after it opens are a late swing, not a dismissal. */
-const GRACE_MS = 400;
 /** How long it shows, with play frozen, unless dismissed. */
 const SHOW_MS = 5000;
 
@@ -22,23 +21,15 @@ export function RestModal({
   sides: readonly [Side, Side];
   onDismiss: () => void;
 }) {
-  const opened = useRef(0);
+  const ready = useDismissKeys(onDismiss, result);
   useEffect(() => {
-    opened.current = performance.now();
-    const down = (k: KeyboardEvent) => {
-      if (k.repeat || (k.code !== "Space" && k.code !== "Enter")) return;
-      k.preventDefault();
-      if (performance.now() - opened.current >= GRACE_MS) onDismiss();
-    };
-    window.addEventListener("keydown", down);
     const timer = setTimeout(onDismiss, SHOW_MS);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("keydown", down);
     };
   }, [result, onDismiss]);
   const close = () => {
-    if (performance.now() - opened.current >= GRACE_MS) onDismiss();
+    if (ready()) onDismiss();
   };
 
   const labels: Labels = Object.fromEntries(sides.map((s) => [s.id, s.label]));

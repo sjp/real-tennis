@@ -6,6 +6,7 @@ import { standardCourt as court } from "../court/standard.ts";
 import { TEACHING, type TeachingId } from "../rules/teaching.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
 import { word } from "../teach/wording.ts";
+import { useDismissKeys } from "./dismissKeys.ts";
 import { useTouchShown } from "./inputMode.ts";
 import { polygonGeometry } from "./geometry.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
@@ -120,18 +121,8 @@ export function ExplainPanel({
 }) {
   const e = EXPLANATIONS[id];
   const touch = useTouchShown();
-  useEffect(() => {
-    const down = (k: KeyboardEvent) => {
-      if (k.code === "Space" || k.code === "Enter") {
-        k.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", down);
-    return () => {
-      window.removeEventListener("keydown", down);
-    };
-  }, [onClose]);
+  // Not for a late or held swing: this is the Marker's main teaching (201).
+  useDismissKeys(onClose, id);
   return (
     <div
       style={{
