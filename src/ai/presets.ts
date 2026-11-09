@@ -28,10 +28,10 @@ export interface AiPreset {
 
 export const AI_PRESETS: Readonly<Record<AiLevel, AiPreset>> = {
   easy: {
-    reaction: 0.35,
-    noise: 0.35,
-    timing: 0.08,
-    speed: 0.6,
+    reaction: 0.31,
+    noise: 0.225,
+    timing: 0.055,
+    speed: 0.69,
     aim: 0.5,
     ambition: 0.05,
     boast: 0.1,
@@ -55,8 +55,8 @@ export const AI_PRESETS: Readonly<Record<AiLevel, AiPreset>> = {
   },
   hard: {
     reaction: 0.15,
-    noise: 0.08,
-    timing: 0.025,
+    noise: 0.175,
+    timing: 0.047,
     speed: 0.9,
     aim: 0.15,
     ambition: 0.3,
