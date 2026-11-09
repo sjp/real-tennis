@@ -270,7 +270,8 @@ class Rally {
         const side = sideOf(e.position.z);
         if (!s.crossed) return this.lose(striker, "notOverNet");
         if (side === this.endOf(striker)) {
-          return s.drop === null ? this.lose(striker, "cameBack") : this.chaseTheLine(side);
+          // Law 9.2(b)(iv): the chase is laid where it dropped, against the striker.
+          return s.drop === null ? this.lose(striker, "cameBack") : this.chaseTheLine(s.drop);
         }
         if (s.drop === null && e.type === "floorBounce") return this.next({ drop: side });
         return this.fallAt(floor(e.position));
@@ -284,6 +285,11 @@ class Rally {
     const striker = this.s.striker!;
     if (!this.s.crossed) return this.lose(striker, "notOverNet");
     const o = this.court.openings.find((o) => o.id === id)!;
+    // Back over the net into one of the striker's own openings: as for the floor.
+    if (o.side === this.endOf(striker)) {
+      const drop = this.s.drop;
+      return drop === null ? this.lose(striker, "cameBack") : this.chaseTheLine(drop);
+    }
     if (o.outcome.kind === "win") {
       const reason = id === "dedans" || id === "grille" ? id : "winningGallery";
       return this.point(striker, reason);

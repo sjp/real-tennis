@@ -305,9 +305,20 @@ describe("laying chases (Law 9.2)", () => {
     });
   });
 
-  it("makes Chase the Line when the ball drops and comes back over (050 decision 7)", () => {
+  it("lays Chase the Line where the ball dropped, when it comes back over (Law 9.2(b)(iv))", () => {
     const o = outcome([...returned, serviceSide(13), cross("service"), bounce(0, 1)]);
-    expect(o).toMatchObject({ kind: "chase", call: { name: "Hazard Chase the Line" } });
+    expect(o).toMatchObject({
+      kind: "chase",
+      call: { name: "Chase the Line", mark: { side: "service" } },
+    });
+    // The same as falling back into the net (232).
+    const net_ = outcome([...returned, serviceSide(13), net("service")]);
+    expect(o).toEqual(net_);
+  });
+
+  it("lays Chase the Line where it dropped, for a ball that comes back into the striker's opening", () => {
+    const o = outcome([...returned, serviceSide(13), cross("service"), opening("winningGallery")]);
+    expect(o).toMatchObject({ kind: "chase", call: { mark: { side: "service" } } });
   });
 
   it("uses the rest position when the ball rolls dead after one bounce", () => {
@@ -392,6 +403,18 @@ describe("losing the rest (Law 11.2)", () => {
       winner: S,
       reason: "touchedNet",
     });
+  });
+
+  it("(j) coming back over the net into the striker's own opening (232)", () => {
+    // The receiver, into their own Winning Gallery.
+    expect(
+      outcome([...returned, cross("hazard"), cross("service"), opening("winningGallery")]),
+    ).toMatchObject({ winner: S, reason: "cameBack" });
+    // The server, into their own Dedans.
+    const served = [...goodService, hit(R, 3), cross("hazard"), hit(S, -3)];
+    expect(
+      outcome([...served, cross("service"), cross("hazard"), opening("dedans")]),
+    ).toMatchObject({ winner: R, reason: "cameBack" });
   });
 
   it("(j) coming back over the net and dropping on the striker's side", () => {
