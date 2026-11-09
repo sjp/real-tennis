@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SimEvent } from "../sim/events.ts";
-import { cameraStart, describeEvent, describeNotice } from "./view.ts";
+import { standardCourt as court } from "../court/standard.ts";
+import { ABOVE, cameraHeight, cameraStart, describeEvent, describeNotice } from "./view.ts";
 
 const at = { time: 0, position: { x: 0, y: 0, z: 0 }, surface: "floor" } as const;
 const ev = (e: Record<string, unknown>) => ({ ...at, ...e }) as SimEvent;
@@ -59,5 +60,27 @@ describe("cameraStart", () => {
     expect([x, z]).toEqual([1, -1]);
     expect(y).toBeGreaterThan(2);
     expect(cameraStart({ x: 1, z: -4 }, "hazard")[2]).toBe(1);
+  });
+});
+
+describe("cameraHeight", () => {
+  const hl = court.floor.length / 2;
+  const { dedans, grille } = court.penthouses.depth;
+
+  it("stays up in mid-court, and drops under each end penthouse to its own depth", () => {
+    expect(cameraHeight(0)).toBe(ABOVE);
+    for (const [z, depth] of [
+      [hl, grille],
+      [-hl, dedans],
+    ] as const) {
+      const sign = Math.sign(z);
+      expect(cameraHeight(sign * (hl - depth))).toBeCloseTo(ABOVE);
+      expect(cameraHeight(sign * (hl - depth - 1))).toBe(ABOVE);
+      const half = cameraHeight(sign * (hl - depth / 2));
+      expect(half).toBeLessThan(ABOVE);
+      expect(half).toBeGreaterThan(cameraHeight(z));
+      expect(cameraHeight(z)).toBeCloseTo(2);
+      expect(cameraHeight(z + sign * 3)).toBeCloseTo(2);
+    }
   });
 });

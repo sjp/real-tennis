@@ -3,7 +3,7 @@ import { memo, useRef } from "react";
 import { Vector3, type Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { FloorPoint, Side, Vec3 } from "../court/types.ts";
-import { ABOVE, BEHIND } from "./view.ts";
+import { BEHIND, cameraHeight } from "./view.ts";
 import {
   assist,
   ASSIST_HORIZON,
@@ -30,17 +30,6 @@ const TURN = 0.3;
 const WATCH = 0.4;
 /** How far the camera slides sideways, away from the ball, to keep it in view. */
 const SHIFT = 0.5;
-/** Camera height once behind the end wall: below the end penthouse, whose underside isn't drawn. */
-const UNDER = 2;
-
-/** Camera height at `z`: dropping beneath the end penthouse as the camera nears the end wall. */
-function cameraHeight(z: number): number {
-  const p = court.penthouses;
-  const depth = z > 0 ? p.depth.grille : p.depth.dedans;
-  const into = (Math.abs(z) - (court.floor.length / 2 - depth)) / depth;
-  return ABOVE + (UNDER - ABOVE) * Math.max(0, Math.min(1, into));
-}
-
 /**
  * Keeps the camera behind and above a player, looking down the court. While
  * the ball is live it turns part way towards the ball, so a service coming

@@ -8,6 +8,17 @@ import type { SimEvent } from "../sim/events.ts";
 export const BEHIND = 5;
 export const ABOVE = 3.8;
 
+/** Camera height once behind the end wall: below the end penthouse, whose underside isn't drawn. */
+const UNDER = 2;
+
+/** Camera height at `z`: dropping beneath the end penthouse as the camera nears the end wall. */
+export function cameraHeight(z: number): number {
+  const p = court.penthouses;
+  const depth = z > 0 ? p.depth.grille : p.depth.dedans;
+  const into = (Math.abs(z) - (court.floor.length / 2 - depth)) / depth;
+  return ABOVE + (UNDER - ABOVE) * Math.max(0, Math.min(1, into));
+}
+
 /** Where the camera starts, behind a player at `at`. */
 export function cameraStart(at: FloorPoint, end: Side): [number, number, number] {
   const f = end === "service" ? 1 : -1;
