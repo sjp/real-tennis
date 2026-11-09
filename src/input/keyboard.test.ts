@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { keyboard } from "./keyboard.ts";
+import { keyboard, withModifier } from "./keyboard.ts";
 
 const target = new EventTarget() as unknown as Window;
 const key = (type: string, code: string) =>
   target.dispatchEvent(Object.assign(new Event(type), { code, repeat: false }));
+const visible: { visibilityState: DocumentVisibilityState } = { visibilityState: "visible" };
+const doc = Object.assign(new EventTarget(), visible);
 
 describe("keyboard", () => {
   it("turns keys into InputState, counting presses once", () => {
@@ -20,5 +22,26 @@ describe("keyboard", () => {
     key("keyup", "KeyW");
     expect(kb.read().move).toEqual({ x: 1, y: 0 });
     kb.dispose();
+  });
+
+  it("lets go of held keys when the tab is hidden, or Cmd is released (202)", () => {
+    const kb = keyboard(target, doc);
+    key("keydown", "KeyW");
+    doc.visibilityState = "hidden";
+    doc.dispatchEvent(new Event("visibilitychange"));
+    expect(kb.read().move).toEqual({ x: 0, y: 0 });
+    doc.visibilityState = "visible";
+    key("keydown", "KeyA");
+    key("keyup", "MetaLeft");
+    expect(kb.read().move).toEqual({ x: 0, y: 0 });
+    kb.dispose();
+  });
+
+  it("tells browser shortcuts from game keys (202)", () => {
+    const none = { ctrlKey: false, metaKey: false, altKey: false };
+    expect(withModifier(none)).toBe(false);
+    expect(withModifier({ ...none, ctrlKey: true })).toBe(true);
+    expect(withModifier({ ...none, metaKey: true })).toBe(true);
+    expect(withModifier({ ...none, altKey: true })).toBe(true);
   });
 });

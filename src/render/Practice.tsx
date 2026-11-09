@@ -9,6 +9,7 @@ import {
   startServe,
   type PracticeState,
 } from "../game/practice.ts";
+import { withModifier } from "../input/keyboard.ts";
 import { touch as createTouch, type Touch } from "../input/touch.ts";
 import { useCompact, useTouchShown } from "./inputMode.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
@@ -193,7 +194,8 @@ export function Practice() {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      // Not Ctrl+F (find) or Ctrl+R (reload): those are the browser's (202).
+      if (e.repeat || withModifier(e)) return;
       const c = COMMANDS.find((c) => c.code === e.code);
       if (c) command(c);
     };

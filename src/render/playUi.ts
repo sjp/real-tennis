@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { withModifier } from "../input/keyboard.ts";
 import { toggle } from "../teach/explain.ts";
 import type { ExplainStore } from "./explainStore.ts";
 import { settings } from "./settings.ts";
@@ -36,7 +37,7 @@ export function usePlayUi(explain: ExplainStore): PlayUi {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat || withModifier(e)) return;
       const o = open.current;
       if (e.code === "Escape") {
         if (o.rules) setRules(false);
