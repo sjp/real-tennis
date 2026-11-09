@@ -20,7 +20,7 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => ({
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 });
-export const length = (a: Vec3): number => Math.hypot(a.x, a.y, a.z);
+export const length = (a: Vec3): number => Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 export const lengthSq = (a: Vec3): number => dot(a, a);
 
 /** The unit vector along `a`, or zero if `a` is zero. */
