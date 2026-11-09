@@ -1,6 +1,7 @@
 import type { MatchState } from "../rules/match.ts";
 import type { PlayerId } from "../rules/rally.ts";
 import { leads, scoreColumns } from "./scoreColumns.ts";
+import { srOnly } from "./view.ts";
 
 export interface Side {
   readonly id: PlayerId;
@@ -35,13 +36,12 @@ export function Scoreboard({ match, sides }: { match: MatchState; sides: readonl
           return (
             <tr key={s.id} style={{ color: s.color, fontSize: 15 }}>
               <td style={{ whiteSpace: "nowrap" }}>
-                <span
-                  aria-label={match.server === s.id ? "serving" : undefined}
-                  style={{ display: "inline-block", width: 20, color: "#ffd166" }}
-                >
+                {/* The dot is for the eye; a screen reader hears "(serving)" (213). */}
+                <span aria-hidden style={{ display: "inline-block", width: 20, color: "#ffd166" }}>
                   {match.server === s.id ? "●" : ""}
                 </span>
                 {s.label}
+                {match.server === s.id && <span style={srOnly}> (serving)</span>}
               </td>
               {columns.map((c) => (
                 <td
