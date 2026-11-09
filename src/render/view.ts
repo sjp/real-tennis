@@ -65,8 +65,40 @@ export const panel = {
   borderRadius: 6,
 } as const;
 
+type Edge = "top" | "right" | "bottom" | "left";
+
+/** `px` in from an edge of the screen, or further if the notch or home indicator is (214). */
+export function inset(edge: Edge, px: number): string {
+  return `max(${String(px)}px, var(--safe-${edge}))`;
+}
+
+/** The screen's width less the safe areas and `px`. */
+export function widthLess(px: number): string {
+  return `calc(100vw - ${String(px)}px - var(--safe-left) - var(--safe-right))`;
+}
+
+/** The screen's height with the toolbars showing, less the safe areas and `px` (214). */
+export function heightLess(px: number): string {
+  return `calc(var(--full-height) - ${String(px)}px - var(--safe-top) - var(--safe-bottom))`;
+}
+
+/** A full screen that scrolls, its contents clear of a notch (214). */
+export const page = {
+  position: "fixed",
+  inset: 0,
+  overflow: "auto",
+  boxSizing: "border-box",
+  padding: "var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left)",
+  background: "#101418",
+} as const;
+
 /** The HUD in the top left: half the screen at most, leaving room for the touch buttons. */
-export const hudPanel = { ...panel, left: 12, top: 12, maxWidth: "min(520px, 48vw)" } as const;
+export const hudPanel = {
+  ...panel,
+  left: inset("left", 12),
+  top: inset("top", 12),
+  maxWidth: "min(520px, 48vw)",
+} as const;
 
 /** A panel in the middle of the screen that fits a phone. */
 export const centred = {
@@ -76,8 +108,8 @@ export const centred = {
   transform: "translate(-50%, -50%)",
   // Not shrunk to the half of the screen right of `left`.
   width: "max-content",
-  maxWidth: "min(520px, calc(100vw - 32px))",
-  maxHeight: "calc(100vh - 32px)",
+  maxWidth: `min(520px, ${widthLess(32)})`,
+  maxHeight: heightLess(32),
   overflow: "auto",
   boxSizing: "border-box",
 } as const;

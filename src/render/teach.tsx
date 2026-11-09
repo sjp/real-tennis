@@ -10,7 +10,7 @@ import { useDismissKeys } from "./dismissKeys.ts";
 import { useTouchShown } from "./inputMode.ts";
 import { useReducedMotion } from "./media.ts";
 import { polygonGeometry } from "./geometry.ts";
-import { HIGHLIGHT, panel } from "./view.ts";
+import { HIGHLIGHT, heightLess, inset, panel, widthLess } from "./view.ts";
 
 /** A court feature, glowing, with its name. */
 export const Highlight = memo(function Highlight({
@@ -131,10 +131,10 @@ export function ExplainPanel({
     <div
       style={{
         ...panel,
-        right: 12,
-        top: 12,
-        maxWidth: "min(380px, calc(100vw - 24px))",
-        maxHeight: "calc(100vh - 24px)",
+        right: inset("right", 12),
+        top: inset("top", 12),
+        maxWidth: `min(380px, ${widthLess(24)})`,
+        maxHeight: heightLess(24),
         overflow: "auto",
         boxSizing: "border-box",
         padding: "12px 16px",

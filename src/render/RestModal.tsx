@@ -3,7 +3,7 @@ import type { RestResult } from "../game/result.ts";
 import { callScore, type Labels } from "../rules/score.ts";
 import { useDismissKeys } from "./dismissKeys.ts";
 import { Scoreboard, type Side } from "./Scoreboard.tsx";
-import { panel } from "./view.ts";
+import { panel, widthLess } from "./view.ts";
 
 /** How long it shows, with play frozen, unless dismissed. */
 const SHOW_MS = 5000;
@@ -56,7 +56,7 @@ export function RestModal({
           top: "38%",
           transform: "translate(-50%, -50%)",
           width: "max-content",
-          maxWidth: "min(420px, calc(100vw - 32px))",
+          maxWidth: `min(420px, ${widthLess(32)})`,
           boxSizing: "border-box",
           padding: "14px 20px",
           textAlign: "center",

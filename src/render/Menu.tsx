@@ -1,4 +1,4 @@
-import { HIGHLIGHT, panel } from "./view.ts";
+import { heightLess, HIGHLIGHT, panel, widthLess } from "./view.ts";
 
 const ITEMS = [
   { href: "?learn", title: "Learn", text: "Guided lessons, one rule at a time" },
@@ -22,7 +22,9 @@ export function Menu() {
           left: "50%",
           top: "50%",
           transform: "translate(-50%, -50%)",
-          width: "min(420px, calc(100vw - 32px))",
+          width: `min(420px, ${widthLess(32)})`,
+          maxHeight: heightLess(32),
+          overflow: "auto",
           boxSizing: "border-box",
           padding: "16px 20px",
         }}
