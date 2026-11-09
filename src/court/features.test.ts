@@ -3,29 +3,34 @@ import { featureName, featureShape, markZ, type CourtFeature } from "./features.
 import { serviceLineZ } from "./classify.ts";
 import { standardCourt as court } from "./standard.ts";
 
+// Every feature but the openings: a new one won't compile until it's listed here.
+const ALL = {
+  net: true,
+  mainWall: true,
+  sideWall: true,
+  serviceWall: true,
+  tambour: true,
+  dedansPenthouse: true,
+  sidePenthouse: true,
+  servicePenthouse: true,
+  grillePenthouse: true,
+  grilleEnd: true,
+  outOfCourt: true,
+  serviceLine: true,
+  faultLine: true,
+  secondGalleryLine: true,
+  serviceCourt: true,
+  hazardCourt: true,
+  pass: true,
+  serviceEnd: true,
+  hazardEnd: true,
+  chaseLines: true,
+  hazardChaseLines: true,
+  galleries: true,
+} as const satisfies Record<Exclude<CourtFeature, `opening:${string}`>, true>;
+
 const FEATURES: readonly CourtFeature[] = [
-  "net",
-  "mainWall",
-  "sideWall",
-  "serviceWall",
-  "tambour",
-  "dedansPenthouse",
-  "sidePenthouse",
-  "servicePenthouse",
-  "grillePenthouse",
-  "grilleEnd",
-  "outOfCourt",
-  "serviceLine",
-  "faultLine",
-  "secondGalleryLine",
-  "serviceCourt",
-  "hazardCourt",
-  "pass",
-  "serviceEnd",
-  "hazardEnd",
-  "chaseLines",
-  "hazardChaseLines",
-  "galleries",
+  ...(Object.keys(ALL) as (keyof typeof ALL)[]),
   ...court.openings.map((o) => `opening:${o.id}` as const),
 ];
 

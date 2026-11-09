@@ -1,6 +1,6 @@
 import { faultLineX, serviceLineZ } from "./classify.ts";
 import { collisionGeometry, type SurfaceId } from "./collision.ts";
-import type { ChaseMark, CourtDefinition, OpeningId, Side, Vec3 } from "./types.ts";
+import type { ChaseLineId, ChaseMark, CourtDefinition, OpeningId, Side, Vec3 } from "./types.ts";
 
 /** A part of the court that teaching can highlight and label (070). */
 export type CourtFeature =
@@ -35,7 +35,11 @@ export interface FeatureShape {
   readonly label: Vec3;
 }
 
-const FEATURE_NAMES: Readonly<Record<string, string>> = {
+type OpeningFeature = `opening:${OpeningId}`;
+
+const isOpening = (f: CourtFeature): f is OpeningFeature => f.startsWith("opening:");
+
+const FEATURE_NAMES: Readonly<Record<Exclude<CourtFeature, OpeningFeature>, string>> = {
   net: "Net",
   mainWall: "Main Wall",
   sideWall: "Side Wall",
@@ -61,15 +65,27 @@ const FEATURE_NAMES: Readonly<Record<string, string>> = {
 };
 
 export function featureName(court: CourtDefinition, f: CourtFeature): string {
-  if (f.startsWith("opening:")) return court.openings.find((o) => `opening:${o.id}` === f)!.name;
-  return FEATURE_NAMES[f]!;
+  if (isOpening(f)) return court.openings.find((o) => `opening:${o.id}` === f)!.name;
+  return FEATURE_NAMES[f];
 }
 
 /** How far a highlight sits off its surface, so it doesn't flicker into it. */
 const LIFT = 0.01;
 const UP: Vec3 = { x: 0, y: 1, z: 0 };
 
-const SURFACES: Partial<Record<CourtFeature, readonly SurfaceId[]>> = {
+type SurfaceFeature =
+  | "mainWall"
+  | "sideWall"
+  | "serviceWall"
+  | "tambour"
+  | "dedansPenthouse"
+  | "sidePenthouse"
+  | "servicePenthouse"
+  | "grillePenthouse"
+  | "grilleEnd"
+  | "outOfCourt";
+
+const SURFACES: Readonly<Record<SurfaceFeature, readonly SurfaceId[]>> = {
   mainWall: ["mainWall"],
   sideWall: ["sideWall"],
   serviceWall: ["serviceWall"],
@@ -173,12 +189,12 @@ function featurePolygons(court: CourtDefinition, f: CourtFeature): FeatureShape[
     case "galleries":
       return openingSensors(court, NON_WINNING);
     default:
-      if (f.startsWith("opening:")) return openingSensors(court, [f.slice(8) as OpeningId]);
-      return surfacePolygons(court, SURFACES[f]!);
+      if (isOpening(f)) return openingSensors(court, [f.slice(8) as OpeningId]);
+      return surfacePolygons(court, SURFACES[f]);
   }
 }
 
-function lineDistance(court: CourtDefinition, id: string): number {
+function lineDistance(court: CourtDefinition, id: ChaseLineId): number {
   return court.chaseLines.find((l) => l.id === id)!.distance;
 }
 
