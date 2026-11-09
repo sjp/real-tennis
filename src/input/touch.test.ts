@@ -32,6 +32,27 @@ describe("touch", () => {
     expect(t.read().move).toEqual({ x: 0, y: 0 });
   });
 
+  it("lets go of everything on reset (200)", () => {
+    const t = touch();
+    t.stickStart(1, 100, 300);
+    t.stickMove(1, 100, 200);
+    t.swing();
+    t.select(2);
+    t.reset();
+    expect(t.stick()).toBeNull();
+    expect(t.read()).toMatchObject({ move: { x: 0, y: 0 }, swing: false, select: null });
+  });
+
+  it("keeps the stick on the first thumb when a second finger lands (200)", () => {
+    const t = touch();
+    t.stickStart(1, 100, 300);
+    t.stickStart(2, 50, 50);
+    t.stickEnd(2);
+    expect(t.stick()?.origin).toEqual({ x: 100, y: 300 });
+    t.stickMove(1, 100, 300 - STICK_RADIUS);
+    expect(t.read().move).toEqual({ x: 0, y: 1 });
+  });
+
   it("counts a press once", () => {
     const t = touch();
     t.swing();

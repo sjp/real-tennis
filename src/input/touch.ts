@@ -25,6 +25,8 @@ export interface Touch {
   readonly select: (n: number) => void;
   /** The current input. Presses since the last read count once. */
   readonly read: () => InputState;
+  /** Lets go of everything, e.g. when the controls go away mid-touch (200). */
+  readonly reset: () => void;
 }
 
 export function touch(): Touch {
@@ -35,6 +37,8 @@ export function touch(): Touch {
 
   return {
     stickStart(pointer, x, y) {
+      // A second finger doesn't take over a thumb that's still down.
+      if (id !== null) return;
       id = pointer;
       stick = { origin: { x, y }, at: { x, y } };
     },
@@ -65,6 +69,12 @@ export function touch(): Touch {
       swing = false;
       select = null;
       return input;
+    },
+    reset() {
+      id = null;
+      stick = null;
+      swing = false;
+      select = null;
     },
   };
 }

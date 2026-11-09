@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { SHOT_TYPES, type ShotType } from "../input/input.ts";
 import { STICK_RADIUS, type Stick, type Touch } from "../input/touch.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
@@ -95,6 +95,13 @@ export function TouchControls({
   onPause: () => void;
 }) {
   const [stick, setStick] = useState<Stick | null>(null);
+  // Unmounted with a thumb down (a pause, an explanation), no pointerup arrives.
+  useEffect(
+    () => () => {
+      touch.reset();
+    },
+    [touch],
+  );
   const thumb = (e: PointerEvent, f: (id: number, x: number, y: number) => void) => {
     f(e.pointerId, e.clientX, e.clientY);
     setStick(touch.stick());
