@@ -7,6 +7,7 @@ import { SWING_TIME } from "../player/timing.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { vec, ZERO, type Vec3 } from "../sim/vec.ts";
 import { createWorld, initialState, STEP } from "../sim/world.ts";
+import { seeded } from "../util/random.ts";
 import {
   changeEnds,
   feedDrop,
@@ -222,9 +223,14 @@ describe("practice", () => {
   });
 
   it("judges an unreturned machine feed as a chase on the player's side", () => {
-    let seed = 3;
-    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const { state } = run(feedMachine(world, fed, random), 4);
+    // Step aside after the feed, so the ball can't touch the idle player.
+    const s = feedMachine(world, fed, seeded(3));
+    const { x, z } = s.motion.position;
+    const aside = {
+      ...s,
+      motion: { ...s.motion, position: { x: x - Math.sign(x || 1) * 2.5, z } },
+    };
+    const { state } = run(aside, 4);
     expect(state.rally?.outcome).toMatchObject({
       kind: "chase",
       call: { mark: { side: "service" } },
@@ -232,9 +238,7 @@ describe("practice", () => {
   });
 
   it("feeds from the machine to land near the player", () => {
-    let seed = 1;
-    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const s = feedMachine(world, fed, random);
+    const s = feedMachine(world, fed, seeded(1));
     const bounce = run(s, 3).events.find((e) => e.type === "floorBounce")!;
     const p = s.motion.position;
     expect(Math.abs(bounce.position.x - p.x)).toBeLessThan(2);
@@ -243,12 +247,14 @@ describe("practice", () => {
   });
 
   it("feeds over the net every time", () => {
+    let feeds = 0;
     for (let seed = 1; seed < 40; seed++) {
-      const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      const { events } = run(feedMachine(world, fed, random), 3);
+      const { events } = run(feedMachine(world, fed, seeded(seed)), 3);
       expect(events.some((e) => e.type === "netHit")).toBe(false);
       expect(events.find((e) => e.type === "floorBounce")!.position.z).toBeLessThan(0);
+      feeds++;
     }
+    expect(feeds).toBe(39);
   });
 
   it("changes ends", () => {
