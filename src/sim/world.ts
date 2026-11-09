@@ -48,9 +48,16 @@ interface Bounds {
 type Body = Bounds &
   (
     | {
-        readonly kind: "polygon" | "opening";
+        readonly kind: "polygon";
         readonly surface: SurfaceId;
-        readonly opening?: OpeningId;
+        readonly origin: Vec3;
+        readonly normal: Vec3;
+        readonly edges: readonly Edge[];
+      }
+    | {
+        /** A sensor: crossing it against its normal enters the opening. */
+        readonly kind: "opening";
+        readonly opening: OpeningId;
         readonly origin: Vec3;
         readonly normal: Vec3;
         readonly edges: readonly Edge[];
@@ -69,6 +76,9 @@ type Body = Bounds &
         readonly x1: number;
       }
   );
+
+/** Anything the ball bounces off, rather than passes into. */
+type Solid = Exclude<Body, { readonly kind: "opening" }> | PlayerCapsule;
 
 export interface World {
   readonly court: CourtDefinition;
@@ -119,19 +129,25 @@ export function createWorld(
   for (const p of collisionGeometry(court)) {
     switch (p.kind) {
       case "polygon":
-      case "opening": {
-        const pad = p.kind === "polygon" ? r : 0;
         bodies.push({
-          kind: p.kind,
-          surface: p.kind === "polygon" ? p.surface : "outOfCourt",
-          ...(p.kind === "opening" ? { opening: p.opening } : {}),
+          kind: "polygon",
+          surface: p.surface,
           origin: p.vertices[0]!,
           normal: p.normal,
           edges: polygonEdges(p.vertices, p.normal),
-          ...bounds(p.vertices, pad),
+          ...bounds(p.vertices, r),
         });
         break;
-      }
+      case "opening":
+        bodies.push({
+          kind: "opening",
+          opening: p.opening,
+          origin: p.vertices[0]!,
+          normal: p.normal,
+          edges: polygonEdges(p.vertices, p.normal),
+          ...bounds(p.vertices, 0),
+        });
+        break;
       case "segment":
         if (!(length(sub(p.b, p.a)) > MIN_LENGTH))
           throw new Error("Collision segment has no length");
@@ -276,11 +292,10 @@ function firstHit(
   return best;
 }
 
-function contactNormal(body: Body | PlayerCapsule, p: Vec3): Vec3 {
+function contactNormal(body: Solid, p: Vec3): Vec3 {
   if (!("kind" in body)) return normalize(sub(p, closestOnSegment(p, body.a, body.b)));
   switch (body.kind) {
     case "polygon":
-    case "opening":
       return body.normal;
     case "segment":
       return normalize(sub(p, closestOnSegment(p, body.a, body.b)));
@@ -289,7 +304,7 @@ function contactNormal(body: Body | PlayerCapsule, p: Vec3): Vec3 {
   }
 }
 
-function materialFor(m: Materials, body: Body | PlayerCapsule): Material {
+function materialFor(m: Materials, body: Solid): Material {
   if (!("kind" in body)) return m.player;
   if (body.kind === "netMesh") return m.netMesh;
   if (body.kind === "segment" && body.cord) return m.netCord;
@@ -359,18 +374,13 @@ export function step(
     remaining -= t;
     skip.add(hit.body);
     const at = { time: s.time, position: ball.position };
-    const body = hit.body;
-
-    if ("kind" in body && body.kind === "opening") {
-      emit({
-        ...at,
-        type: "enteredOpening",
-        opening: body.opening!,
-        surface: `opening:${body.opening!}`,
-      });
-      s = { ...s, ball, captured: body.opening!, live: false };
+    if ("kind" in hit.body && hit.body.kind === "opening") {
+      const { opening } = hit.body;
+      emit({ ...at, type: "enteredOpening", opening, surface: `opening:${opening}` });
+      s = { ...s, ball, captured: opening, live: false };
       return { state: s, events };
     }
+    const body: Solid = hit.body;
 
     const n = contactNormal(body, ball.position);
     // Push the ball back out to touching, so penetration can't build up.
@@ -459,11 +469,10 @@ export function step(
 }
 
 /** Distance from the contact surface to the ball's centre, along `n`. */
-function distanceAlong(body: Body | PlayerCapsule, c: Vec3, n: Vec3): number {
+function distanceAlong(body: Solid, c: Vec3, n: Vec3): number {
   if (!("kind" in body)) return length(sub(c, closestOnSegment(c, body.a, body.b))) - body.radius;
   switch (body.kind) {
     case "polygon":
-    case "opening":
       return dot(sub(c, body.origin), n);
     case "segment":
       return length(sub(c, closestOnSegment(c, body.a, body.b)));
