@@ -8,6 +8,14 @@ const hazard = (distance: number) => chaseName(court, { side: "hazard", distance
 const line = (id: string) => court.chaseLines.find((l) => l.id === id)!.distance;
 
 describe("chaseName", () => {
+  it("doesn't crash for a side with no chase lines (195)", () => {
+    const bare = { ...court, chaseLines: court.chaseLines.filter((l) => l.side === "service") };
+    expect(chaseName(bare, { side: "hazard", distance: 2 }).name).toBe("Unnamed hazard chase");
+    expect(chaseName({ ...court, chaseLines: [] }, { side: "service", distance: 2 }).name).toBe(
+      "Unnamed chase",
+    );
+  });
+
   it("names a Fall on a line after that line (Law 9.2(b))", () => {
     expect(service(yards(2))).toBe("Two");
     expect(service(yards(2.5) + 0.03)).toBe("Two and Three");

@@ -24,6 +24,11 @@ export function chaseName(
   const d = mark.distance;
   const call = (name: string): ChaseCall => ({ name, mark });
 
+  // A custom court with no lines this side has nothing to name it by (195).
+  if (lines.length === 0) {
+    return call(mark.side === "service" ? "Unnamed chase" : "Unnamed hazard chase");
+  }
+
   const onLine = nearest(lines, d);
   if (Math.abs(onLine.distance - d) <= tolerance) return call(onLine.name);
 
