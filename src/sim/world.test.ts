@@ -4,7 +4,15 @@ import { standardCourt as court } from "../court/standard.ts";
 import { kineticEnergy, standardBall } from "./ball.ts";
 import type { SimEvent } from "./events.ts";
 import { dot, length, madd, normalize, scale, sub, vec, ZERO, type Vec3 } from "./vec.ts";
-import { createWorld, initialState, predict, step, STEP, type SimState } from "./world.ts";
+import {
+  createWorld,
+  initialState,
+  predict,
+  standardMaterials,
+  step,
+  STEP,
+  type SimState,
+} from "./world.ts";
 import { seeded } from "../util/random.ts";
 
 const world = createWorld(court);
@@ -361,6 +369,25 @@ describe("step", () => {
       expect(events).toEqual([]);
       expect(state).toEqual({ ...s, time: s.time + STEP });
     }
+  });
+
+  it("advances the clock by exactly dt, even past the contact cap (195)", () => {
+    // A ball rattling round an elastic cage of players makes more contacts than a step allows.
+    const bouncy = createWorld(
+      court,
+      { ...standardBall, gravity: 0 },
+      { ...standardMaterials, player: { restitution: 1, friction: 0 } },
+    );
+    const cage = Array.from({ length: 40 }, (_, i) => {
+      const a = (i / 40) * 2 * Math.PI;
+      const at = (y: number) => vec(0.3 * Math.cos(a), y, -5 + 0.3 * Math.sin(a));
+      return { id: String(i), a: at(0.5), b: at(1.5), radius: 0.05 };
+    });
+    const s = launch(vec(0, 1, -5), vec(30, 0, 7));
+    const { state } = step(bouncy, s, cage, 0.1);
+    expect(state.time).toBeCloseTo(0.1, 12);
+    // Still inside the cage.
+    expect(Math.hypot(state.ball.position.x, state.ball.position.z + 5)).toBeLessThan(0.3);
   });
 
   it("is deterministic", () => {

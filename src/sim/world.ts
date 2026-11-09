@@ -199,6 +199,8 @@ const FALL_ROLL = 0.5;
 const SLEEP_SPEED = 0.01;
 /** Floor and wall contacts this close together make a nick. */
 const NICK_WINDOW = 0.01;
+/** Most contacts resolved in one step. */
+const MAX_CONTACTS = 8;
 /** Rolling resistance on the floor, as a fraction of g (⚠ verify). */
 const ROLLING_RESISTANCE = 0.03;
 
@@ -339,13 +341,14 @@ export function step(
     s.lastFloorTime = s.time;
   };
 
-  for (let i = 0; i < 8 && remaining > 0; i++) {
+  for (let i = 0; i < MAX_CONTACTS && remaining > 0; i++) {
     const next = flight(p, ball, remaining);
     const hit = firstHit(world, ball.position, next.position, skip, players);
     if (hit === null) {
       s.time += remaining;
       crossing(ball.position, next.position);
       ball = next;
+      remaining = 0;
       break;
     }
     const t = hit.s * remaining;
@@ -414,6 +417,10 @@ export function step(
       s.lastWallTime = s.time;
     }
   }
+
+  // Out of contacts, e.g. wedged in a corner: hold the ball where its last
+  // contact left it, so time still advances by exactly dt.
+  s.time += remaining;
 
   // A safety net: a ball that has somehow escaped the court is out of it.
   if (ball.position.y < -ESCAPED) {
