@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { featureName, featureShape, markZ, type CourtFeature } from "./features.ts";
 import { serviceLineZ } from "./classify.ts";
+import { netHeightAt } from "./collision.ts";
 import { standardCourt as court } from "./standard.ts";
 
 // Every feature but the openings: a new one won't compile until it's listed here.
@@ -56,9 +57,12 @@ describe("court features", () => {
     expect(Math.min(...vs.map((v) => v.x))).toBe(-hw);
     expect(Math.max(...vs.map((v) => v.x))).toBe(hw);
     expect(Math.min(...vs.map((v) => v.y))).toBe(0);
-    const top = Math.max(...vs.map((v) => v.y));
-    expect(top).toBeGreaterThanOrEqual(court.net.centreHeight);
-    expect(top).toBeLessThanOrEqual(court.net.endHeight);
+    // Its top follows the cord's sag, from the centre to the walls (195).
+    for (const v of vs.filter((v) => v.y > 0)) expect(v.y).toBeCloseTo(netHeightAt(court, v.x));
+    expect(Math.max(...vs.map((v) => v.y))).toBeCloseTo(court.net.endHeight);
+    expect(Math.min(...vs.filter((v) => v.y > 0).map((v) => v.y))).toBeCloseTo(
+      court.net.centreHeight,
+    );
     expect(label.x).toBeCloseTo(0);
     expect(label.z).toBe(0);
   });

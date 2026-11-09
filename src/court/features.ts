@@ -1,5 +1,5 @@
 import { faultLineX, serviceLineZ } from "./classify.ts";
-import { collisionGeometry, type SurfaceId } from "./collision.ts";
+import { collisionGeometry, netHeightAt, type SurfaceId } from "./collision.ts";
 import type { ChaseLineId, ChaseMark, CourtDefinition, OpeningId, Side, Vec3 } from "./types.ts";
 
 /** A part of the court that teaching can highlight and label (070). */
@@ -68,6 +68,9 @@ export function featureName(court: CourtDefinition, f: CourtFeature): string {
   if (isOpening(f)) return court.openings.find((o) => `opening:${o.id}` === f)!.name;
   return FEATURE_NAMES[f];
 }
+
+/** Strips in the net's highlight. */
+const NET_PIECES = 24;
 
 /** How far a highlight sits off its surface, so it doesn't flicker into it. */
 const LIFT = 0.01;
@@ -150,18 +153,17 @@ function featurePolygons(court: CourtDefinition, f: CourtFeature): FeatureShape[
 
   switch (f) {
     case "net": {
-      const h = court.net.centreHeight;
-      return [
-        {
-          vertices: [
-            { x: -hw, y: 0, z: 0 },
-            { x: hw, y: 0, z: 0 },
-            { x: hw, y: h, z: 0 },
-            { x: -hw, y: h, z: 0 },
-          ],
-          normal: { x: 0, y: 0, z: 1 },
-        },
-      ];
+      // Strips under the sagging cord, each convex, up to 1.524 m at the walls.
+      const x = (i: number) => -hw + (2 * hw * i) / NET_PIECES;
+      return Array.from({ length: NET_PIECES }, (_, i) => ({
+        vertices: [
+          { x: x(i), y: 0, z: 0 },
+          { x: x(i + 1), y: 0, z: 0 },
+          { x: x(i + 1), y: netHeightAt(court, x(i + 1)), z: 0 },
+          { x: x(i), y: netHeightAt(court, x(i)), z: 0 },
+        ],
+        normal: { x: 0, y: 0, z: 1 },
+      }));
     }
     case "serviceLine":
       return [across(lineZ)];
