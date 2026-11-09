@@ -201,6 +201,37 @@ describe("walls", () => {
     expect(events[0]).toMatchObject({ type: "tambourHit" });
   });
 
+  const tx = -hw + court.tambour.projection;
+  const tz1 = hl - court.tambour.edge;
+
+  it("reports a nick at the tambour, whichever it meets first (194)", () => {
+    // 10 m/s each way: 0.05 m further from one surface is 5 ms later.
+    for (const [dx, dy] of [
+      [0.05, 0],
+      [0, 0],
+      [0, 0.05],
+    ]) {
+      const { events } = predict(
+        weightless,
+        launch(vec(tx + r + 1 + dx!, r + 1 + dy!, hl - 2), vec(-10, -10, 0)),
+        0.5,
+      );
+      expect(types(events).slice(0, 3).toSorted()).toEqual(["floorBounce", "nick", "tambourHit"]);
+    }
+  });
+
+  it("keeps a ball dropped on the tambour on its top, out of court (194)", () => {
+    const top = court.outOfCourtHeight.main;
+    const { events, path } = predict(
+      world,
+      launch(vec(-hw + 0.25, 6.5, tz1 + 1), vec(0, -1, 0)),
+      2,
+    );
+    expect(events[0]).toMatchObject({ type: "outOfCourt" });
+    expect(types(events)).not.toContain("floorBounce");
+    expect(Math.min(...path.map((p) => p.y))).toBeGreaterThan(top);
+  });
+
   it("ends the ball's life above the Out of Court Line", () => {
     const { events, state } = predict(world, launch(vec(0, 2, -0.5), vec(0, 14, -12)), 3);
     expect(events[0]).toMatchObject({ type: "outOfCourt" });

@@ -358,6 +358,10 @@ export function collisionGeometry(court: CourtDefinition): CollisionPrimitive[] 
   );
   poly("tambour", [v(tx, 0, tz1), v(tx, th, tz1), v(tx, th, hl), v(tx, 0, hl)], v(1, 0, 0));
   seg("tambour", v(tx, 0, tz1), v(tx, th, tz1));
+  // Its top is level with the Out of Court Line, and touching the line is out (194).
+  poly("outOfCourt", [v(-hw, th, tz0), v(-hw, th, hl), v(tx, th, hl), v(tx, th, tz1)], v(0, 1, 0));
+  seg("outOfCourt", v(-hw, th, tz0), v(tx, th, tz1));
+  seg("outOfCourt", v(tx, th, tz1), v(tx, th, hl));
 
   out.push({ kind: "net", surface: "net", x0: -hw, x1: hw });
   return out;

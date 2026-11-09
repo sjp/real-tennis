@@ -396,6 +396,8 @@ export function step(
       emit({ ...at, type: "penthouseHit", edge: surface.startsWith("penthouseEdge"), surface });
     } else if (surface === "tambour") {
       emit({ ...at, type: "tambourHit", surface });
+      // A nick in either order, as at the Main Wall (194).
+      if (s.time - s.lastFloorTime <= NICK_WINDOW) emit({ ...at, type: "nick", surface });
       s.lastWallTime = s.time;
     } else {
       emit({ ...at, type: "wallHit", surface });

@@ -20,6 +20,8 @@ describe("collisionGeometry", () => {
     const inside = { x: 0, y: 3, z: 0 };
     const backwards = polygons
       .filter((p) => !p.surface.startsWith("joue:"))
+      // The tambour's top faces up, above the test point.
+      .filter((p) => !(p.normal.y === 1 && p.vertices[0]!.y > inside.y))
       .filter((p) => dot(sub(inside, p.vertices[0]!), p.normal) <= 0)
       .map((p) => p.surface);
     expect(backwards).toEqual([]);
