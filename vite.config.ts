@@ -15,6 +15,12 @@ export default defineConfig(({ command, isPreview }) => ({
     // --localstorage-file is given. Turn it off: the stores already fall back
     // when storage is missing, and the warning is only noise.
     execArgv: ["--no-experimental-webstorage"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}"],
+      reporter: ["text", "json-summary"],
+    },
   },
   build: {
     // The three chunk (three.js, R3F and drei) is about 950 kB on its own and
