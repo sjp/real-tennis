@@ -92,14 +92,21 @@ export function basePosition(world: World, end: Side): FloorPoint {
   return { x: 0.5, z: -forwardZ(end) * (world.court.floor.length / 2 - 5) };
 }
 
-/** The serving contact time: when the tossed ball is best placed. */
+/** Steps a swing takes from the press to contact, rounded up. */
+const SWING_STEPS = Math.ceil(SWING_TIME / STEP - 1e-9);
+
+/**
+ * The serving contact time: when the tossed ball is best placed, at least
+ * SWING_TIME away so the swing can meet it. An overarm toss passes the contact
+ * height on the way up too soon for that, so this is the ball coming down.
+ */
 export function serveContact(world: World, me: Athlete, sim: SimState): number {
   const path = predict(world, sim, 2).path;
-  let best = { cost: Infinity, i: 0 };
-  path.forEach((b, i) => {
-    const cost = serveMiss(me, b);
+  let best = { cost: Infinity, i: SWING_STEPS };
+  for (let i = SWING_STEPS; i < path.length; i++) {
+    const cost = serveMiss(me, path[i]!);
     if (cost < best.cost) best = { cost, i };
-  });
+  }
   return sim.time + best.i * STEP;
 }
 

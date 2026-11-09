@@ -6,6 +6,7 @@ import { playerCapsule, serveMiss, type Athlete } from "../game/player.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { SERVE_STYLES, serveSpot, toss } from "../player/serve.ts";
 import { aimAt } from "../player/shot.ts";
+import { SWING_TIME } from "../player/timing.ts";
 import { startRally } from "../rules/rally.ts";
 import { vec, ZERO } from "../sim/vec.ts";
 import { createWorld, initialState, predict, STEP } from "../sim/world.ts";
@@ -202,10 +203,14 @@ describe("serveContact", () => {
       const style = SERVE_STYLES[serveStyle]!;
       const sim = initialState(toss(style, me.motion.position, "service", world.ball.gravity), 3);
       const t = serveContact(world, me, sim);
-      expect(t).toBeGreaterThan(3);
+      // Far enough ahead for a swing pressed now to meet it.
+      expect(t - 3).toBeGreaterThanOrEqual(SWING_TIME);
       expect(t).toBeLessThan(5);
-      const ball = predict(world, sim, 2).path[Math.round((t - 3) / STEP)]!;
-      expect(serveMiss(me, ball)).toBeLessThan(0.02);
+      const path = predict(world, sim, 2).path;
+      const i = Math.round((t - 3) / STEP);
+      expect(serveMiss(me, path[i]!)).toBeLessThan(0.02);
+      // On its way down: an overarm toss passes the height too soon going up.
+      expect(path[i + 1]!.y).toBeLessThan(path[i]!.y);
     },
   );
 });
