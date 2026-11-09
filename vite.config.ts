@@ -1,11 +1,21 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 // https://vite.dev/config/
 export default defineConfig(({ command, isPreview }) => ({
   plugins: [react()],
   // Served from https://sjp.github.io/real-tennis/; the dev server stays at /.
   base: command === "build" || isPreview ? "/real-tennis/" : "/",
+  test: {
+    testTimeout: 10_000,
+    // No test mocks modules or stubs globals, so files can share workers;
+    // this saves about a third of the run.
+    isolate: false,
+    // Node 25+ exposes a localStorage global that warns on first use unless
+    // --localstorage-file is given. Turn it off: the stores already fall back
+    // when storage is missing, and the warning is only noise.
+    execArgv: ["--no-experimental-webstorage"],
+  },
   build: {
     // The three chunk (three.js, R3F and drei) is about 950 kB on its own and
     // can't be split further usefully; everything else is well under 500 kB.
