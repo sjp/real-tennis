@@ -10,8 +10,12 @@ const world = createWorld(court);
 const config: MatchConfig = { players: ["a", "b"], sets: 1, suddenDeath: false };
 /** Each one-set match finishes in well under this much play. */
 const LIMIT = 60 * 60;
-/** Test timeout for a whole match, or for the two Hard v Easy ones together, in ms. */
-const SLOW = 20_000;
+/**
+ * Test timeout for a whole match, or for the two Hard v Easy ones together, in
+ * ms. A match takes about 6 s here but over 30 s on a CI runner, since the AI
+ * simulates its own run (237), so this only catches a match that never ends.
+ */
+const SLOW = 120_000;
 
 /** Ways of losing a rest that the AI's own choices could cause. */
 const BLUNDERS: readonly TeachingId[] = [
