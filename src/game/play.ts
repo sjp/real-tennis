@@ -149,7 +149,7 @@ export function playStep(
   const judged: RallyInput[] = [];
   let sim = state.sim;
   let athletes = state.athletes.map((a) => {
-    const r = act(world, a, sim, inputs[a.id]!, autoHit.includes(a.id));
+    const r = act(world, a, sim, inputs[a.id]!, autoHit.includes(a.id), state.rally);
     sim = r.sim;
     events.push(...r.events);
     judged.push(...r.judged);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { standardCourt as court } from "../court/standard.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
+import { startRally } from "../rules/rally.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { vec, ZERO, type Vec3 } from "../sim/vec.ts";
@@ -181,6 +182,27 @@ describe("auto-hit (130, 131)", () => {
     expect(autoContact({ ...fed, serve: "tossed" }, sim)).toBeNull();
     const swinging = run(fed, STEP, swing).state;
     expect(autoContact(swinging, sim)).toBeNull();
+  });
+
+  describe("never strikes a ball it would lose on (231)", () => {
+    // A hazard-end player by the net, the ball beside them on the far side.
+    const near = { ...fed, id: "r", end: "hazard" as const, rally: null };
+    near.motion = { position: { x: 0, z: 0.6 }, velocity: { x: 0, z: 0 } };
+    const sim = { ...fed.sim, ball: { position: vec(0.05, 1, -0.3), velocity: ZERO, spin: ZERO } };
+    const rest = startRally({ court, server: "s", receiver: "r", playingFor: null }, "s");
+
+    it("not before it has crossed the net (Law 11.2(g))", () => {
+      expect(autoContact(near, sim)).toBeNull();
+      expect(autoContact(near, sim, rest)).toBeNull();
+      // On this side, it's played.
+      const over = { ...sim, ball: { ...sim.ball, position: vec(0.05, 1, 0.3) } };
+      expect(autoContact(near, over, { ...rest, crossed: true })).not.toBeNull();
+    });
+
+    it("but still after it dropped on this side and came back", () => {
+      const back = { ...rest, crossed: true, cameBack: true, drop: "hazard" as const };
+      expect(autoContact(near, sim, back)).not.toBeNull();
+    });
   });
 
   it("still needs a swing to serve", () => {

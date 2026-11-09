@@ -85,7 +85,7 @@ export function practiceStep(
   input: InputState,
   autoHit = false,
 ): PracticeResult {
-  const acted = act(world, state, state.sim, input, autoHit);
+  const acted = act(world, state, state.sim, input, autoHit, state.rally);
   let s: PracticeState = { ...state, ...acted.athlete, sim: acted.sim };
   const events = [...acted.events];
   const notices = [...acted.notices];

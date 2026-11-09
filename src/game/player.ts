@@ -4,7 +4,7 @@ import { forwardZ, move, standardPlayer, type Motion } from "../player/movement.
 import { handPosition, overServiceLine, planServe, SERVE_STYLES, toss } from "../player/serve.ts";
 import { planShot } from "../player/shot.ts";
 import { GOOD, grade, PERFECT, POOR, SWING_TIME, type Timing } from "../player/timing.ts";
-import type { RallyInput } from "../rules/rally.ts";
+import { rally as judge, type RallyInput, type RallyState } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { hit } from "../sim/racket.ts";
 import { madd, vec, ZERO, type Vec3 } from "../sim/vec.ts";
@@ -172,14 +172,20 @@ export interface Action {
  * only: never a serve, never the athlete's own shot, and not during a manual
  * swing. It fires when the ball is within AUTO_REACH of the body, at its
  * closest approach, or straight away if it's about to hit the body.
+ *
+ * Given the rest, it never makes a stroke the rules would lose on, e.g. a
+ * ball that hasn't crossed the net (231). Without one, it only takes balls on
+ * the athlete's side.
  */
 export function autoContact(
   a: Athlete,
   sim: SimState,
+  rest: RallyState | null = null,
 ): { readonly timing: Timing; readonly backhand: boolean } | null {
   if (a.swing !== null || a.serve !== null) return null;
   if (!sim.live || sim.asleep || sim.captured !== null || sim.lastHitTime === a.struck) return null;
   const b = sim.ball.position;
+  if (!legalStroke(a, sim, rest)) return null;
   const d = nearness(a.motion, b);
   if (d > AUTO_REACH) return null;
   const next = nearness(a.motion, madd(b, sim.ball.velocity, STEP));
@@ -193,6 +199,20 @@ export function autoContact(
   const ahead = (b.z - z) * forwardZ(a.end) >= 0 ? 1 : -1;
   const error = d <= inner ? 0 : ahead * (PERFECT + late * (GOOD - PERFECT));
   return { timing: grade(error, backhand), backhand };
+}
+
+function legalStroke(a: Athlete, sim: SimState, rest: RallyState | null): boolean {
+  const b = sim.ball.position;
+  if (rest === null) return b.z * forwardZ(a.end) <= 0;
+  if (rest.outcome) return true;
+  const hit = {
+    type: "racketHit",
+    player: a.id,
+    time: sim.time,
+    position: b,
+    surface: "racket",
+  } as const;
+  return judge(rest, hit).state.outcome === null;
 }
 
 /** How far a ball at `b` is from the body's axis, plus how far outside the auto-hit heights. */
@@ -212,6 +232,7 @@ export function act(
   sim: SimState,
   input: InputState,
   autoHit = false,
+  rest: RallyState | null = null,
 ): Action {
   const notices: Notice[] = [];
   const judged: RallyInput[] = [];
@@ -270,7 +291,7 @@ export function act(
     }
   }
 
-  const auto = autoHit ? autoContact(a, sim) : null;
+  const auto = autoHit ? autoContact(a, sim, rest) : null;
   if (auto) {
     // Shown as a swing already at contact, so the follow-through plays.
     a = {
