@@ -1,4 +1,4 @@
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, type RefObject } from "react";
 import type { Mesh } from "three";
 import type { Vec3 } from "../court/types.ts";
@@ -13,7 +13,7 @@ import { advance } from "./stepLoop.ts";
  * Steps a game at a fixed rate (210), and draws the ball between steps. It
  * owns the keyboard, merged with the touch `pad`. While `isPaused`, nothing
  * steps, and the frame that resumes is skipped, so the key that resumes isn't
- * a swing. `frame` may change the input once a frame, before stepping.
+ * a swing; the same when the canvas stops its frame loop. `frame` may change the input once a frame, before stepping.
  * Returns the ball's mesh.
  */
 export function useStepLoop<S>({
@@ -47,6 +47,12 @@ export function useStepLoop<S>({
       keys.current = null;
     };
   }, []);
+
+  // A stopped frame loop (212) is a pause the loop never sees: skip the frame that resumes too.
+  const frameloop = useThree((s) => s.frameloop);
+  useEffect(() => {
+    if (frameloop === "never") loop.current.paused = true;
+  }, [frameloop]);
 
   useFrame((_, delta) => {
     const l = loop.current;

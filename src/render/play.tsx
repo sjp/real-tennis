@@ -1,5 +1,5 @@
-import { Canvas } from "@react-three/fiber";
-import { memo, type ReactNode, type RefObject } from "react";
+import { advance, Canvas, useThree } from "@react-three/fiber";
+import { memo, useEffect, useRef, type ReactNode, type RefObject } from "react";
 import type { Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { CourtFeature } from "../court/features.ts";
@@ -42,8 +42,29 @@ export interface PlayViews {
 }
 
 /**
+ * While the frame loop is stopped, draws one frame whenever the scene is
+ * re-rendered or resized, e.g. the court markings turned on from the pause
+ * menu. Not on the render that stops it: that frame is already drawn.
+ */
+function StillFrame({ stopped }: { stopped: boolean }) {
+  const get = useThree((s) => s.get);
+  useThree((s) => s.size);
+  const was = useRef(stopped);
+  useEffect(() => {
+    if (stopped && was.current) {
+      const state = get();
+      // One frame on from the stopped clock, as the loop would have drawn it.
+      advance(state.clock.elapsedTime + 1 / 60, true, state);
+    }
+    was.current = stopped;
+  });
+  return null;
+}
+
+/**
  * The court, lights, player and camera every playing screen draws (210).
  * `children` are the screen's own: its loop, the opponent, chase markers.
+ * While `stopped` (the pause menu or the rules is open), nothing is drawn (212).
  */
 export function PlayCanvas({
   start,
@@ -51,6 +72,7 @@ export function PlayCanvas({
   feature,
   markings,
   assist,
+  stopped,
   children,
 }: {
   /** Where the player starts, for the first camera position. */
@@ -59,10 +81,15 @@ export function PlayCanvas({
   feature: CourtFeature | null | undefined;
   markings: boolean;
   assist: boolean;
+  stopped: boolean;
   children: ReactNode;
 }) {
   return (
-    <Canvas dpr={DPR} camera={{ position: cameraStart(start.at, start.end), fov: 55 }}>
+    <Canvas
+      dpr={DPR}
+      frameloop={stopped ? "never" : "always"}
+      camera={{ position: cameraStart(start.at, start.end), fov: 55 }}
+    >
       <color attach="background" args={["#101418"]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[4, 12, -6]} intensity={1.8} />
@@ -77,6 +104,7 @@ export function PlayCanvas({
       {markings && <Markings />}
       <AssistRings view={views.assist} on={assist} />
       <FollowCamera target={views.camera} />
+      <StillFrame stopped={stopped} />
     </Canvas>
   );
 }

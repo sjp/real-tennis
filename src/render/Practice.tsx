@@ -215,6 +215,7 @@ export function Practice() {
         feature={feature}
         markings={ui.markings}
         assist={assist}
+        stopped={ui.menu || ui.rules}
       >
         <Loop
           store={store}

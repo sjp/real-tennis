@@ -313,6 +313,7 @@ function LessonGame({
         feature={feature}
         markings={ui.markings}
         assist={assist}
+        stopped={ui.menu || ui.rules}
       >
         {isMatch && <Player view={views.opponent} trim={OPPONENT_TRIM} />}
         <Loop

@@ -346,6 +346,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         feature={feature}
         markings={ui.markings}
         assist={assist}
+        stopped={ui.menu || ui.rules}
       >
         <Player view={views.opponent} trim={OPPONENT_TRIM} />
         <Loop
