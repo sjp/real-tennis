@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { standardCourt as court } from "../court/standard.ts";
 import type { MatchConfig } from "../rules/match.ts";
 import type { TeachingId } from "../rules/teaching.ts";
@@ -10,7 +10,7 @@ const world = createWorld(court);
 const config: MatchConfig = { players: ["a", "b"], sets: 1, suddenDeath: false };
 /** Each one-set match finishes in well under this much play. */
 const LIMIT = 60 * 60;
-/** Test timeout for a whole match, in ms. */
+/** Test timeout for a whole match, or for the two Hard v Easy ones together, in ms. */
 const SLOW = 20_000;
 
 /** Ways of losing a rest that the AI's own choices could cause. */
@@ -40,7 +40,10 @@ describe("AI against AI", () => {
 
   describe("Hard against Easy", () => {
     const presets = { a: AI_PRESETS.hard, b: AI_PRESETS.easy };
-    const matches = [1, 2].map((seed) => playAi(world, config, presets, seed, LIMIT));
+    let matches: ReturnType<typeof playAi>[] = [];
+    beforeAll(() => {
+      matches = [1, 2].map((seed) => playAi(world, config, presets, seed, LIMIT));
+    }, SLOW);
 
     it("is won by Hard", () => {
       expect(matches.map((m) => m.state.match.winner)).toEqual(["a", "a"]);
