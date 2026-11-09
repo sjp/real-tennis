@@ -1,7 +1,7 @@
 import { standardCourt as court } from "../court/standard.ts";
 import type { FloorPoint, Side } from "../court/types.ts";
 import type { Notice } from "../game/player.ts";
-import { PLAYER_ID } from "../game/practice.ts";
+import { PLAYER_ID } from "../game/ids.ts";
 import type { SimEvent } from "../sim/events.ts";
 
 /** Camera placement behind the player. ⚠ verify in play. */

@@ -9,7 +9,7 @@ import { useCompact, useTouchShown } from "./inputMode.ts";
 import type { SimState } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
 import { learner, lessonStep, startLesson, type LessonState } from "../teach/lesson.ts";
-import { LESSONS, OPPONENT_ID, type Lesson } from "../teach/lessons.ts";
+import { LESSONS, type Lesson } from "../teach/lessons.ts";
 import { word } from "../teach/wording.ts";
 import {
   createExplainStore,
@@ -25,7 +25,7 @@ import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
 import { settings, useSettings } from "./settings.ts";
 import { hear } from "../audio/engine.ts";
-import { PLAYER_ID } from "../game/practice.ts";
+import { OPPONENT_ID, PLAYER_ID } from "../game/ids.ts";
 import { length } from "../sim/vec.ts";
 import { describeNotice, HIGHLIGHT, hudPanel, centred, FPS } from "./view.ts";
 import { FpsMeter } from "./Fps.tsx";

@@ -9,6 +9,7 @@ import type { BallState } from "../sim/ball.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { vec, ZERO } from "../sim/vec.ts";
 import { initialState, step, type SimState, type World } from "../sim/world.ts";
+import { MACHINE_ID, PLAYER_ID } from "./ids.ts";
 import {
   act,
   afterStep,
@@ -21,10 +22,6 @@ import {
 } from "./player.ts";
 
 const params = standardPlayer;
-
-export const PLAYER_ID = "human";
-/** The ball machine, standing in for an opponent at the far end. */
-export const MACHINE_ID = "machine";
 
 export interface PracticeState extends Athlete {
   readonly sim: SimState;

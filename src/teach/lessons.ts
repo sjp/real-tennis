@@ -1,14 +1,11 @@
 import { chaseName } from "../court/chase.ts";
 import type { CourtFeature } from "../court/features.ts";
 import type { CourtDefinition, Side } from "../court/types.ts";
-import { PLAYER_ID } from "../game/practice.ts";
+import { OPPONENT_ID, PLAYER_ID } from "../game/ids.ts";
 import { startMatch, type MatchState } from "../rules/match.ts";
 import type { RallyOutcome, RallyState } from "../rules/rally.ts";
 import type { TeachingEvent, TeachingId } from "../rules/teaching.ts";
 import type { SimEvent } from "../sim/events.ts";
-
-/** The AI opponent in match lessons. */
-export const OPPONENT_ID = "opponent";
 
 /** What a lesson's objective sees after each step. */
 export interface StepView {

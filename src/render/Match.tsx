@@ -4,7 +4,7 @@ import { AI_PRESETS, type AiLevel } from "../ai/presets.ts";
 import { athleteOf, CALL_PAUSE, playStep, startPlay, type PlayState } from "../game/play.ts";
 import { restResult, type RestResult } from "../game/result.ts";
 import { playerCapsule, type Athlete } from "../game/player.ts";
-import { PLAYER_ID } from "../game/practice.ts";
+import { OPPONENT_ID, PLAYER_ID } from "../game/ids.ts";
 import { touch as createTouch, type Touch } from "../input/touch.ts";
 import { useCompact, useTouchShown } from "./inputMode.ts";
 import type { MatchConfig } from "../rules/match.ts";
@@ -53,7 +53,6 @@ import {
 import { useStepLoop } from "./useStepLoop.ts";
 import { world } from "./world.ts";
 
-const OPPONENT_ID = "opponent";
 const LABELS: Labels = { [PLAYER_ID]: "Player", [OPPONENT_ID]: "Opponent" };
 /** The scoreboard's rows, in the players' colours lightened to read on the dark HUD. */
 const SIDES: readonly [Side, Side] = [

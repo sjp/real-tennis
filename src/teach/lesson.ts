@@ -1,11 +1,11 @@
 import { aiInput, FRESH, type AiMemory } from "../ai/ai.ts";
 import { AI_PRESETS } from "../ai/presets.ts";
+import { OPPONENT_ID, PLAYER_ID } from "../game/ids.ts";
 import { athleteOf, playFrom, playStep, receiveSpot, type PlayState } from "../game/play.ts";
 import { playerCapsule, type Notice } from "../game/player.ts";
 import {
   feedMachine,
   initialPractice,
-  PLAYER_ID,
   practiceStep,
   startServe,
   type PracticeState,
@@ -14,7 +14,7 @@ import type { InputState } from "../input/input.ts";
 import type { TeachingEvent } from "../rules/teaching.ts";
 import type { SimEvent } from "../sim/events.ts";
 import type { World } from "../sim/world.ts";
-import { OPPONENT_ID, type Lesson, type StepView } from "./lessons.ts";
+import type { Lesson, StepView } from "./lessons.ts";
 
 /** Seconds between one drill rest ending and the next feed or service. */
 export const FEED_PAUSE = 1.2;
