@@ -209,3 +209,48 @@ describe("serveContact", () => {
     },
   );
 });
+
+/**
+ * Plays AI against AI for `seconds` from the start of a match, calling `see`
+ * with each player's view, input and memory every step.
+ */
+function watch(
+  presets: Readonly<Record<string, AiPreset>>,
+  seed: number,
+  seconds: number,
+  see: (view: ReturnType<typeof viewOf>, input: InputState, memory: AiMemory) => void,
+) {
+  const random = seeded(seed);
+  let s = startPlay(world, config, random, labels).state;
+  let memory: Record<string, AiMemory> = { a: FRESH, b: FRESH };
+  while (s.phase !== "over" && s.sim.time < seconds) {
+    const inputs: Record<string, InputState> = {};
+    for (const id of ["a", "b"]) {
+      const view = viewOf(s, id);
+      const r = aiInput(world, view, presets[id]!, memory[id]!, random, playerCapsule(view.me));
+      see(view, r.input, r.memory);
+      memory = { ...memory, [id]: r.memory };
+      inputs[id] = r.input;
+    }
+    s = playStep(world, s, inputs).state;
+  }
+}
+
+describe("the AI's input", () => {
+  // The widest aim spread, so unclamped aims would often go past length 1.
+  const wild = { ...AI_PRESETS.easy, aim: 2 };
+  const pairs = [
+    { a: AI_PRESETS.hard, b: AI_PRESETS.medium },
+    { a: AI_PRESETS.easy, b: wild },
+    { a: wild, b: AI_PRESETS.hard },
+  ];
+
+  it.each([1, 2, 3, 4, 5, 6])("never moves faster than a human can (seed %i)", (seed) => {
+    let longest = 0;
+    watch(pairs[seed % pairs.length]!, seed, 40, (_, input) => {
+      longest = Math.max(longest, Math.hypot(input.move.x, input.move.y));
+    });
+    expect(longest).toBeGreaterThan(0.5);
+    expect(longest).toBeLessThanOrEqual(1 + 1e-12);
+  });
+});

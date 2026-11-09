@@ -1,6 +1,6 @@
 import type { ChaseMark, FloorPoint, Side } from "../court/types.ts";
 import { HIGH, LOW, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
-import { IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
+import { clampMove, IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
 import { forwardZ, standardPlayer } from "../player/movement.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import { rally, type PlayerId, type RallyOutcome, type RallyState } from "../rules/rally.ts";
@@ -84,7 +84,7 @@ function runTo(me: Athlete, to: FloorPoint, speed: number): InputState {
   const f = forwardZ(me.end);
   // The inverse of `moveDirection`.
   const k = (Math.min(1, d / 0.6) * speed) / d;
-  return { ...IDLE, move: { x: -dx * f * k, y: dz * f * k } };
+  return { ...IDLE, move: clampMove(-dx * f * k, dz * f * k) };
 }
 
 /** Where it waits between shots: the middle of its end. ⚠ verify */
@@ -358,10 +358,7 @@ function makePlan(
     stand,
     swingAt: target.t - SWING_TIME + gaussian(random) * preset.timing * (1 + 2 * hurry),
     shot,
-    aim: {
-      x: Math.max(-1, Math.min(1, aim.x + gaussian(random) * preset.aim)),
-      y: Math.max(-1, Math.min(1, aim.y + gaussian(random) * preset.aim)),
-    },
+    aim: clampMove(aim.x + gaussian(random) * preset.aim, aim.y + gaussian(random) * preset.aim),
   };
 }
 
@@ -394,7 +391,7 @@ export function aiInput(
         stand: me.motion.position,
         swingAt: contact - SWING_TIME + gaussian(random) * preset.timing * 0.5,
         shot: me.shot,
-        aim: { x: gaussian(random) * preset.aim, y: gaussian(random) * preset.aim },
+        aim: clampMove(gaussian(random) * preset.aim, gaussian(random) * preset.aim),
       };
     }
     return { input: strike(me, plan, now), memory: { ...memory, plan } };

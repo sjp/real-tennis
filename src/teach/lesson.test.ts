@@ -18,6 +18,7 @@ const LIMIT = 240 * 300;
 const ADVICE: Readonly<Record<string, { shot: number; aim: InputState["move"] }>> = {
   openings: { shot: 3, aim: { x: 0, y: 1 } },
   hazardChase: { shot: 3, aim: { x: 0, y: -1 } },
+  tambour: { shot: 1, aim: { x: 1, y: 0 } },
 };
 
 /** Plays a lesson with the Hard AI standing in for the learner. */
