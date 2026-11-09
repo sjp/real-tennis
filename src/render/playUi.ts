@@ -16,6 +16,40 @@ export interface PlayUi {
   readonly toggleMarkings: () => void;
 }
 
+/** What a key does on a playing screen. */
+export type PlayKey = "menu" | "closeRules" | "rules" | "markings" | "explain" | "assist";
+
+/**
+ * The action for a key press: Esc closes the rules if open, else toggles the
+ * pause menu. A held key or a browser shortcut (Ctrl, Cmd or Alt) does nothing.
+ */
+export function playKey(
+  e: {
+    readonly code: string;
+    readonly repeat: boolean;
+    readonly ctrlKey: boolean;
+    readonly metaKey: boolean;
+    readonly altKey: boolean;
+  },
+  rulesOpen: boolean,
+): PlayKey | null {
+  if (e.repeat || withModifier(e)) return null;
+  switch (e.code) {
+    case "Escape":
+      return rulesOpen ? "closeRules" : "menu";
+    case "Slash":
+      return "rules";
+    case "KeyM":
+      return "markings";
+    case "KeyX":
+      return "explain";
+    case "KeyH":
+      return "assist";
+    default:
+      return null;
+  }
+}
+
 /**
  * The keys every playing screen shares: Esc pauses (or closes the rules), ?
  * the rules, M markings, X explanations, H hit assist.
@@ -37,16 +71,28 @@ export function usePlayUi(explain: ExplainStore): PlayUi {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.repeat || withModifier(e)) return;
       const o = open.current;
-      if (e.code === "Escape") {
-        if (o.rules) setRules(false);
-        else setMenu(!o.menu);
+      switch (playKey(e, o.rules)) {
+        case "closeRules":
+          setRules(false);
+          break;
+        case "menu":
+          setMenu(!o.menu);
+          break;
+        case "rules":
+          setRules(!o.rules);
+          break;
+        case "markings":
+          setMarkings((m) => !m);
+          break;
+        case "explain":
+          explain.set(toggle(explain.get()));
+          break;
+        case "assist":
+          settings.set({ assist: !settings.get().assist });
+          break;
+        case null:
       }
-      if (e.code === "Slash") setRules(!o.rules);
-      if (e.code === "KeyM") setMarkings((m) => !m);
-      if (e.code === "KeyX") explain.set(toggle(explain.get()));
-      if (e.code === "KeyH") settings.set({ assist: !settings.get().assist });
     };
     window.addEventListener("keydown", down);
     return () => {
