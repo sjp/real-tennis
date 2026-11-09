@@ -1,23 +1,16 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Mesh } from "three";
-import type { ChaseCall } from "../court/chase.ts";
+import { memo, useEffect, useState, type ReactNode } from "react";
 import { featureShape } from "../court/features.ts";
+import type { Vec3 } from "../court/types.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf } from "../game/play.ts";
 import type { MatchState } from "../rules/match.ts";
-import { keyboard } from "../input/keyboard.ts";
-import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
+import { touch as createTouch, type Touch } from "../input/touch.ts";
 import { useCompact, useTouchShown } from "./inputMode.ts";
-import { TouchControls } from "./TouchControls.tsx";
-import { SERVE_STYLES } from "../player/serve.ts";
-import { createWorld, STEP, type SimState } from "../sim/world.ts";
+import type { SimState } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
-import { dismiss, toggle } from "../teach/explain.ts";
 import { learner, lessonStep, startLesson, type LessonState } from "../teach/lesson.ts";
 import { LESSONS, OPPONENT_ID, type Lesson } from "../teach/lessons.ts";
 import { word } from "../teach/wording.ts";
-import { Court } from "./Court.tsx";
 import {
   createExplainStore,
   explainCalls,
@@ -25,45 +18,39 @@ import {
   useExplainer,
   type ExplainStore,
 } from "./explainStore.ts";
-import { ChaseMarkers, Markings } from "./markings.tsx";
-import { Player } from "./Player.tsx";
+import { Player, type PlayerView } from "./Player.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { loadDone, saveDone } from "./progress.ts";
 import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
 import { settings, useSettings } from "./settings.ts";
-import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { hear } from "../audio/engine.ts";
 import { PLAYER_ID } from "../game/practice.ts";
 import { length } from "../sim/vec.ts";
-import { ExplainPanel, Highlight } from "./teach.tsx";
+import { describeNotice, HIGHLIGHT, hudPanel, centred, FPS } from "./view.ts";
+import { FpsMeter } from "./Fps.tsx";
+import { BALL_JUMP, blendAthlete, blendTime, blendVec, createBlend, type Blend } from "./blend.ts";
 import {
-  cameraStart,
-  describeNotice,
-  HIGHLIGHT,
-  panel,
-  hudPanel,
-  centred,
-  DPR,
-  FPS,
-} from "./view.ts";
-import { FpsMeter, FpsProbe } from "./Fps.tsx";
+  BallMesh,
+  Explanation,
+  HelpPanel,
+  HudChases,
+  PlayCanvas,
+  PlayTouch,
+  type PlayViews,
+} from "./play.tsx";
 import {
-  BALL_JUMP,
-  blendAthlete,
-  blendTime,
-  blendVec,
-  createBlend,
-  STEP_FIRST,
-  type Blend,
-} from "./blend.ts";
+  chasesOf as matchChases,
+  choiceOf,
+  createStore,
+  OPPONENT_TRIM,
+  type Chases,
+  type Store as StateStore,
+} from "./playState.ts";
+import { useStepLoop } from "./useStepLoop.ts";
+import { world } from "./world.ts";
 
-const world = createWorld(court);
-const OPPONENT_TRIM = "#b5443c";
-interface Store {
-  get(): LessonState;
-  set(s: LessonState): void;
-}
+type Store = StateStore<LessonState>;
 
 const simOf = (s: LessonState): SimState =>
   s.game.kind === "drill" ? s.game.practice.sim : s.game.play.sim;
@@ -76,34 +63,25 @@ function quiet(s: LessonState): boolean {
   return rally?.outcome !== null || rally.striker === null;
 }
 
-function choice(s: LessonState): string {
-  const a = learner(s);
-  return a.serve !== null ? `Serve: ${SERVE_STYLES[a.serveStyle]!.name}` : `Shot: ${a.shot}`;
-}
+const choice = (s: LessonState): string => choiceOf(learner(s));
 
-interface Hud {
+interface Hud extends Chases {
   readonly progress: number;
   readonly done: boolean;
   readonly choice: string;
   readonly last: string | null;
   readonly calls: readonly string[];
-  /** In a match lesson, chases laid, or being played off. */
-  readonly chases: readonly ChaseCall[];
-  readonly playingOff: boolean;
 }
 
 const matchOf = (s: LessonState): MatchState | null =>
   s.game.kind === "match" ? s.game.play.match : null;
 
-/** One empty list, so a drill's HUD updates leave the chase markers alone. */
-const NO_CHASES: readonly ChaseCall[] = [];
+/** No chases, kept as one object so a drill's HUD updates leave the chase markers alone. */
+const NO_CHASES: Chases = { chases: [], playingOff: false };
 
-function chasesOf(s: LessonState): Pick<Hud, "chases" | "playingOff"> {
+function chasesOf(s: LessonState): Chases {
   const m = matchOf(s);
-  if (!m) return { chases: NO_CHASES, playingOff: false };
-  return m.playOff.length > 0
-    ? { chases: m.playOff, playingOff: true }
-    : { chases: m.chases, playingOff: false };
+  return m ? matchChases(m) : NO_CHASES;
 }
 
 /** Steps the lesson at a fixed rate. */
@@ -123,38 +101,19 @@ const Loop = memo(function Loop({
   /** Where the views draw from: the state before the latest step, and how far past it. */
   blend: Blend<LessonState>;
 }) {
-  const ball = useRef<Mesh>(null);
-  const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ acc: 0, paused: false });
-
-  useEffect(
-    () => () => {
-      keys.dispose();
-    },
-    [keys],
-  );
-
-  useFrame((_, delta) => {
-    const l = loop.current;
-    let input = mergeInputs(keys.read(), pad.read());
-    // Frozen while paused; the key that resumes isn't a swing.
-    const paused = isPaused();
-    if (paused || l.paused) {
-      l.paused = paused;
-      l.acc = 0;
-      return;
-    }
-    l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP && !isPaused()) {
+  const ball = useStepLoop({
+    pad,
+    isPaused,
+    blend,
+    get: store.get,
+    ballOf: (st) => simOf(st).ball.position,
+    step: (input) => {
       const before = store.get();
-      blend.stepping(before);
       const r = lessonStep(world, before, input, Math.random, settings.get().autoHit);
       hear(r.events, length(simOf(before).ball.velocity), (p) =>
         p === PLAYER_ID ? learner(before).shot : undefined,
       );
       store.set(r.state);
-      input = { ...input, swing: false, select: null };
-      l.acc -= STEP;
       explainCalls(explain, r.calls, quiet(r.state));
       const notices = r.notices.map(describeNotice).filter((n) => n.last);
       if (
@@ -172,19 +131,9 @@ const Loop = memo(function Loop({
           calls: [...h.calls, ...r.calls.map((c) => c.message)].slice(-3),
           ...chasesOf(r.state),
         }));
-    }
-    blend.at(l.acc / STEP);
-    const at = drawnBall(blend, store.get());
-    ball.current?.position.set(at.x, at.y, at.z);
-    // Before anything draws from the state this frame.
-  }, STEP_FIRST);
-
-  return (
-    <mesh ref={ball}>
-      <sphereGeometry args={[world.ball.radius, 16, 12]} />
-      <meshStandardMaterial color="#f5f0e1" />
-    </mesh>
-  );
+    },
+  });
+  return <BallMesh ball={ball} />;
 });
 
 const HELP = [
@@ -224,29 +173,8 @@ function LessonHud({ hud, lesson }: { hud: HudStore<Hud>; lesson: Lesson }) {
   );
 }
 
-const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
-  return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
-});
-
-/** The touch controls, re-reading the player's choices whenever the HUD changes. */
-function LessonTouch({
-  hud,
-  store,
-  pad,
-  onPause,
-}: {
-  hud: HudStore<Hud>;
-  store: Store;
-  pad: Touch;
-  onPause: () => void;
-}) {
-  // The player's choices change along with the HUD, so re-read them on every update.
-  useHud(hud, (h) => h);
-  return <TouchControls touch={pad} athlete={learner(store.get())} onPause={onPause} />;
-}
-
 /** The ball as drawn, between the last two steps. */
-const drawnBall = (blend: Blend<LessonState>, s: LessonState) =>
+const drawnBall = (blend: Blend<LessonState>, s: LessonState): Vec3 =>
   blendVec(simOf(blend.prev()).ball.position, simOf(s).ball.position, blend.t(), BALL_JUMP);
 
 /** The opponent in a match lesson, if there is one. */
@@ -264,7 +192,7 @@ function sceneViews(
   lesson: Lesson,
   intro: () => boolean,
   blend: Blend<LessonState>,
-) {
+): PlayViews & { opponent: PlayerView } {
   const time = () => blendTime(simOf(blend.prev()).time, simOf(store.get()).time, blend.t());
   const me = () => blendAthlete(learner(blend.prev()), learner(store.get()), blend.t());
   return {
@@ -317,15 +245,7 @@ function LessonGame({
   onNext: (() => void) | null;
   onQuit: () => void;
 }) {
-  const [store] = useState(() => {
-    let state = startLesson(world, lesson);
-    return {
-      get: () => state,
-      set: (s: LessonState) => {
-        state = s;
-      },
-    };
-  });
+  const [store] = useState(() => createStore(startLesson(world, lesson)));
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
   const [intro, setIntro] = useState(true);
@@ -387,16 +307,13 @@ function LessonGame({
   const { assist } = useSettings();
   return (
     <>
-      <Canvas dpr={DPR} camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
-        <color attach="background" args={["#101418"]} />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[4, 12, -6]} intensity={1.8} />
-        <directionalLight position={[-6, 8, 10]} intensity={0.6} />
-        <Court court={court} />
-        <Ears />
-        {FPS && <FpsProbe />}
-        <ServeLine visible={views.serving} />
-        <Player view={views.player} />
+      <PlayCanvas
+        start={{ at: me.motion.position, end: me.end }}
+        views={views}
+        feature={feature}
+        markings={ui.markings}
+        assist={assist}
+      >
         {isMatch && <Player view={views.opponent} trim={OPPONENT_TRIM} />}
         <Loop
           store={store}
@@ -406,12 +323,8 @@ function LessonGame({
           hud={hud}
           blend={blend}
         />
-        {feature && <Highlight feature={feature} />}
-        {ui.markings && <Markings />}
-        <Chases hud={hud} />
-        <AssistRings view={views.assist} on={assist} />
-        <FollowCamera target={views.camera} />
-      </Canvas>
+        <HudChases hud={hud} />
+      </PlayCanvas>
       {FPS && <FpsMeter />}
       <LessonHud hud={hud} lesson={lesson} />
       {touchShown
@@ -420,22 +333,9 @@ function LessonGame({
           !ui.menu &&
           !ui.rules &&
           !ex.showing && (
-            <LessonTouch
-              hud={hud}
-              store={store}
-              pad={pad}
-              onPause={() => {
-                ui.setMenu(true);
-              }}
-            />
+            <PlayTouch hud={hud} athlete={() => learner(store.get())} pad={pad} ui={ui} />
           )
-        : !compact && (
-            <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-              {HELP.map((h) => (
-                <div key={h}>{h}</div>
-              ))}
-            </div>
-          )}
+        : !compact && <HelpPanel lines={HELP} />}
       {intro && (
         <Centred>
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>{lesson.title}</div>
@@ -466,17 +366,7 @@ function LessonGame({
         </Centred>
       )}
       <PauseMenu ui={ui} explain={explain} leave="Back to the lessons" onLeave={onQuit} />
-      {ex.showing && !intro && (
-        <ExplainPanel
-          id={ex.showing}
-          onClose={() => {
-            explain.set(dismiss(explain.get()));
-          }}
-          onOff={() => {
-            explain.set(toggle(explain.get()));
-          }}
-        />
-      )}
+      {!intro && <Explanation explain={explain} showing={ex.showing} />}
     </>
   );
 }

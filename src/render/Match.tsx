@@ -1,26 +1,17 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { Mesh } from "three";
+import { memo, useState } from "react";
 import { aiInput, FRESH, type AiMemory } from "../ai/ai.ts";
 import { AI_PRESETS, type AiLevel } from "../ai/presets.ts";
-import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf, CALL_PAUSE, playStep, startPlay, type PlayState } from "../game/play.ts";
 import { restResult, type RestResult } from "../game/result.ts";
 import { playerCapsule, type Athlete } from "../game/player.ts";
 import { PLAYER_ID } from "../game/practice.ts";
-import { keyboard } from "../input/keyboard.ts";
-import { mergeInputs, touch as createTouch, type Touch } from "../input/touch.ts";
+import { touch as createTouch, type Touch } from "../input/touch.ts";
 import { useCompact, useTouchShown } from "./inputMode.ts";
-import { TouchControls } from "./TouchControls.tsx";
-import { SERVE_STYLES } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
 import { settings, useSettings, type MatchSetup as Setup } from "./settings.ts";
 import { callScore, type Labels } from "../rules/score.ts";
-import type { ChaseCall } from "../court/chase.ts";
 import type { MatchState } from "../rules/match.ts";
-import { createWorld, STEP } from "../sim/world.ts";
 import { EXPLANATIONS } from "../teach/content.ts";
-import { dismiss, toggle } from "../teach/explain.ts";
 import {
   createExplainStore,
   explainCalls,
@@ -28,7 +19,6 @@ import {
   useExplainer,
   type ExplainStore,
 } from "./explainStore.ts";
-import { ChaseMarkers, Markings } from "./markings.tsx";
 import { PauseMenu } from "./pause.tsx";
 import { Summary } from "./Summary.tsx";
 import { RestModal } from "./RestModal.tsx";
@@ -36,38 +26,34 @@ import { Scoreboard, type Side } from "./Scoreboard.tsx";
 import { decided, strokesIn, type Rest } from "../game/summary.ts";
 import { createHud, useHud, type HudStore } from "./hud.ts";
 import { usePlayUi } from "./playUi.ts";
-import { ExplainPanel, Highlight } from "./teach.tsx";
-import { Court } from "./Court.tsx";
-import { Player } from "./Player.tsx";
-import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
+import { Player, type PlayerView } from "./Player.tsx";
 import { hear } from "../audio/engine.ts";
 import { length } from "../sim/vec.ts";
+import { describeEvent, describeNotice, HIGHLIGHT, hudPanel, centred, FPS } from "./view.ts";
+import { FpsMeter } from "./Fps.tsx";
+import { BALL_JUMP, blendAthlete, blendTime, blendVec, createBlend, type Blend } from "./blend.ts";
 import {
-  cameraStart,
-  describeEvent,
-  describeNotice,
-  HIGHLIGHT,
-  panel,
-  hudPanel,
-  centred,
-  DPR,
-  FPS,
-} from "./view.ts";
-import { FpsMeter, FpsProbe } from "./Fps.tsx";
+  BallMesh,
+  Explanation,
+  HelpPanel,
+  HudChases,
+  PlayCanvas,
+  PlayTouch,
+  type PlayViews,
+} from "./play.tsx";
 import {
-  BALL_JUMP,
-  blendAthlete,
-  blendTime,
-  blendVec,
-  createBlend,
-  STEP_FIRST,
-  type Blend,
-} from "./blend.ts";
+  chasesOf,
+  choiceOf as choice,
+  createStore,
+  OPPONENT_TRIM,
+  type Chases,
+  type Store as StateStore,
+} from "./playState.ts";
+import { useStepLoop } from "./useStepLoop.ts";
+import { world } from "./world.ts";
 
-const world = createWorld(court);
 const OPPONENT_ID = "opponent";
 const LABELS: Labels = { [PLAYER_ID]: "Player", [OPPONENT_ID]: "Opponent" };
-const OPPONENT_TRIM = "#b5443c";
 /** The scoreboard's rows, in the players' colours lightened to read on the dark HUD. */
 const SIDES: readonly [Side, Side] = [
   { id: PLAYER_ID, label: "Player", color: "#8ab8ff" },
@@ -84,22 +70,9 @@ interface Game {
 }
 
 /** The match, owned outside React and stepped every frame. */
-interface Store {
-  get(): Game;
-  set(g: Game): void;
-}
+type Store = StateStore<Game>;
 
-function createStore(game: Game): Store {
-  let state = game;
-  return {
-    get: () => state,
-    set: (g) => {
-      state = g;
-    },
-  };
-}
-
-interface Hud {
+interface Hud extends Chases {
   readonly match: MatchState;
   /** The Marker's call of the score. */
   readonly call: string;
@@ -111,9 +84,6 @@ interface Hud {
   readonly calls: readonly string[];
   readonly event: string | null;
   readonly over: boolean;
-  /** Chases laid, or being played off. */
-  readonly chases: readonly ChaseCall[];
-  readonly playingOff: boolean;
 }
 
 /** A request, from the result modal, to end the Marker's pause now. */
@@ -139,16 +109,6 @@ function createSkip(): Skip {
 
 const human = (store: Store): Athlete => athleteOf(store.get().play, PLAYER_ID);
 
-function choice(a: Athlete): string {
-  return a.serve !== null ? `Serve: ${SERVE_STYLES[a.serveStyle]!.name}` : `Shot: ${a.shot}`;
-}
-
-function chasesOf(m: MatchState): Pick<Hud, "chases" | "playingOff"> {
-  return m.playOff.length > 0
-    ? { chases: m.playOff, playingOff: true }
-    : { chases: m.chases, playingOff: false };
-}
-
 /** Steps the match at a fixed rate, with the AI playing the opponent. */
 const Loop = memo(function Loop({
   game,
@@ -172,38 +132,22 @@ const Loop = memo(function Loop({
   /** The result modal was dismissed: end the Marker's pause now. */
   skip: Skip;
 }) {
-  const ball = useRef<Mesh>(null);
-  const keys = useMemo(() => keyboard(), []);
-  const loop = useRef({ acc: 0, paused: false });
-
-  useEffect(
-    () => () => {
-      keys.dispose();
-    },
-    [keys],
-  );
-
-  useFrame((_, delta) => {
-    const l = loop.current;
-    let input = mergeInputs(keys.read(), pad.read());
-    // Frozen while the Marker explains; the key that resumes isn't a swing.
-    const paused = isPaused();
-    if (paused || l.paused) {
-      l.paused = paused;
-      l.acc = 0;
-      return;
-    }
-    if (skip.take()) {
-      // The key that dismissed the result isn't a swing.
-      input = { ...input, swing: false };
+  const ball = useStepLoop({
+    pad,
+    isPaused,
+    blend,
+    get: () => game.get().play,
+    ballOf: (p) => p.sim.ball.position,
+    frame: (input) => {
+      if (!skip.take()) return input;
       const g = game.get();
       if (g.play.phase === "called")
         game.set({ ...g, play: { ...g.play, since: g.play.sim.time - CALL_PAUSE } });
-    }
-    l.acc += Math.min(delta, 0.1);
-    while (l.acc >= STEP && !isPaused()) {
+      // The key that dismissed the result isn't a swing.
+      return { ...input, swing: false };
+    },
+    step: (input) => {
       const { play: before, memory, rests, strokes: struck } = game.get();
-      blend.stepping(before);
       const view = {
         me: athleteOf(before, OPPONENT_ID),
         sim: before.sim,
@@ -228,8 +172,6 @@ const Loop = memo(function Loop({
         strokes: rest ? 0 : strokes,
       });
       hear(r.events, length(before.sim.ball.velocity), (p) => athleteOf(before, p).shot);
-      input = { ...input, swing: false, select: null };
-      l.acc -= STEP;
 
       const was = athleteOf(before, PLAYER_ID);
       const now = athleteOf(r.state, PLAYER_ID);
@@ -255,19 +197,9 @@ const Loop = memo(function Loop({
           over: r.state.phase === "over",
           ...chasesOf(r.state.match),
         });
-    }
-    blend.at(l.acc / STEP);
-    const at = drawnBall(blend, game.get().play);
-    ball.current?.position.set(at.x, at.y, at.z);
-    // Before anything draws from the state this frame.
-  }, STEP_FIRST);
-
-  return (
-    <mesh ref={ball}>
-      <sphereGeometry args={[world.ball.radius, 16, 12]} />
-      <meshStandardMaterial color="#f5f0e1" />
-    </mesh>
-  );
+    },
+  });
+  return <BallMesh ball={ball} />;
 });
 
 const HELP = [
@@ -306,10 +238,6 @@ function MatchHud({ hud }: { hud: HudStore<Hud> }) {
   );
 }
 
-const Chases = memo(function Chases({ hud }: { hud: HudStore<Hud> }) {
-  return <ChaseMarkers chases={useHud(hud, (h) => h.chases)} />;
-});
-
 /** The result modal; play is frozen while it shows. */
 function Result({ hud, skip }: { hud: HudStore<Hud>; skip: Skip }) {
   const result = useHud(hud, (h) => h.result);
@@ -320,33 +248,18 @@ function Result({ hud, skip }: { hud: HudStore<Hud>; skip: Skip }) {
   return result && <RestModal result={result} sides={SIDES} onDismiss={dismiss} />;
 }
 
-/** The touch controls, re-reading the player's choices whenever the HUD changes. */
-function MatchTouch({
-  hud,
-  game,
-  pad,
-  onPause,
-}: {
-  hud: HudStore<Hud>;
-  game: Store;
-  pad: Touch;
-  onPause: () => void;
-}) {
-  // The player's choices change along with the HUD, so re-read them on every update.
-  useHud(hud, (h) => h);
-  return <TouchControls touch={pad} athlete={human(game)} onPause={onPause} />;
-}
-
-/** The ball as drawn, between the last two steps. */
-const drawnBall = (blend: Blend<PlayState>, play: PlayState) =>
-  blendVec(blend.prev().sim.ball.position, play.sim.ball.position, blend.t(), BALL_JUMP);
-
 /**
  * The scene's views of the match, made once so the scene can skip re-rendering.
  * The figures and the camera are drawn between steps; the hit assist predicts
  * from the stepped state, as the game does.
  */
-function sceneViews(game: Store, explain: ExplainStore, blend: Blend<PlayState>) {
+function sceneViews(
+  game: Store,
+  explain: ExplainStore,
+  blend: Blend<PlayState>,
+): PlayViews & { opponent: PlayerView } {
+  const drawnBall = (play: PlayState) =>
+    blendVec(blend.prev().sim.ball.position, play.sim.ball.position, blend.t(), BALL_JUMP);
   const drawn = (id: string) => {
     const prev = blend.prev();
     const t = blend.t();
@@ -370,7 +283,7 @@ function sceneViews(game: Store, explain: ExplainStore, blend: Blend<PlayState>)
       return {
         at: me.motion.position,
         end: me.end,
-        ball: play.sim.live ? drawnBall(blend, play) : null,
+        ball: play.sim.live ? drawnBall(play) : null,
         focus: focusOf(explain),
       };
     },
@@ -387,7 +300,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     return startPlay(world, config, Math.random, LABELS);
   });
   const [game] = useState(() =>
-    createStore({ play: start.state, memory: FRESH, rests: [], strokes: 0 }),
+    createStore<Game>({ play: start.state, memory: FRESH, rests: [], strokes: 0 }),
   );
   const [explain] = useState(() => {
     const store = createExplainStore();
@@ -427,16 +340,13 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const { assist } = useSettings();
   return (
     <>
-      <Canvas dpr={DPR} camera={{ position: cameraStart(me.motion.position, me.end), fov: 55 }}>
-        <color attach="background" args={["#101418"]} />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[4, 12, -6]} intensity={1.8} />
-        <directionalLight position={[-6, 8, 10]} intensity={0.6} />
-        <Court court={court} />
-        <Ears />
-        {FPS && <FpsProbe />}
-        <ServeLine visible={views.serving} />
-        <Player view={views.player} />
+      <PlayCanvas
+        start={{ at: me.motion.position, end: me.end }}
+        views={views}
+        feature={feature}
+        markings={ui.markings}
+        assist={assist}
+      >
         <Player view={views.opponent} trim={OPPONENT_TRIM} />
         <Loop
           game={game}
@@ -448,25 +358,11 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           blend={blend}
           skip={skip}
         />
-        {feature && <Highlight feature={feature} />}
-        {ui.markings && <Markings />}
-        <Chases hud={hud} />
-        <AssistRings view={views.assist} on={assist} />
-        <FollowCamera target={views.camera} />
-      </Canvas>
+        <HudChases hud={hud} />
+      </PlayCanvas>
       {FPS && <FpsMeter />}
       <MatchHud hud={hud} />
-      {ex.showing && (
-        <ExplainPanel
-          id={ex.showing}
-          onClose={() => {
-            explain.set(dismiss(explain.get()));
-          }}
-          onOff={() => {
-            explain.set(toggle(explain.get()));
-          }}
-        />
-      )}
+      <Explanation explain={explain} showing={ex.showing} />
       {!ui.menu && !ui.rules && !over && <Result hud={hud} skip={skip} />}
       <PauseMenu ui={ui} explain={explain} leave="Leave the match" onLeave={onQuit} />
       {over && (
@@ -482,26 +378,14 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
         ? !ui.menu &&
           !ui.rules &&
           !ex.showing &&
-          !over && (
-            <MatchTouch
-              hud={hud}
-              game={game}
-              pad={pad}
-              onPause={() => {
-                ui.setMenu(true);
-              }}
-            />
-          )
+          !over && <PlayTouch hud={hud} athlete={() => human(game)} pad={pad} ui={ui} />
         : !compact && (
-            <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
-              {HELP.map((h) => (
-                <div key={h}>{h}</div>
-              ))}
+            <HelpPanel lines={HELP}>
               <div>
                 Opponent: {setup.level} · Hit assist: {assist ? "on" : "off"} · Explanations:{" "}
                 {ex.on ? "on" : "off"}
               </div>
-            </div>
+            </HelpPanel>
           )}
     </>
   );
