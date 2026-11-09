@@ -20,3 +20,9 @@ select,
 input {
   touch-action: manipulation;
 }
+
+/* A clear ring for keyboard focus on the dark screens (213). */
+:focus-visible {
+  outline: 2px solid #4cc9f0;
+  outline-offset: 2px;
+}

@@ -351,7 +351,7 @@ function LessonGame({
           )
         : !compact && <HelpPanel lines={HELP} />}
       {intro && (
-        <Centred>
+        <Centred label={lesson.title}>
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>{lesson.title}</div>
           {lesson.intro.map((p) => (
             <p key={p} style={{ margin: "0 0 8px" }}>
@@ -360,6 +360,7 @@ function LessonGame({
           ))}
           <div style={{ color: HIGHLIGHT, margin: "8px 0" }}>Goal: {lesson.goal}</div>
           <button
+            autoFocus
             onClick={() => {
               gate.release();
               setIntro(false);
@@ -370,12 +371,18 @@ function LessonGame({
         </Centred>
       )}
       {done && (
-        <Centred>
+        <Centred label="Lesson complete">
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 8 }}>Lesson complete</div>
           <p style={{ margin: "0 0 12px" }}>{lesson.success}</p>
           <div style={{ display: "flex", gap: 8 }}>
-            {onNext && <button onClick={onNext}>Next lesson</button>}
-            <button onClick={onQuit}>All lessons</button>
+            {onNext && (
+              <button autoFocus onClick={onNext}>
+                Next lesson
+              </button>
+            )}
+            <button autoFocus={!onNext} onClick={onQuit}>
+              All lessons
+            </button>
           </div>
         </Centred>
       )}
@@ -385,9 +392,11 @@ function LessonGame({
   );
 }
 
-function Centred({ children }: { children: ReactNode }) {
+function Centred({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div
+      role="dialog"
+      aria-label={label}
       style={{
         ...centred,
         padding: "16px 20px",

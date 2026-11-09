@@ -69,7 +69,8 @@ export function Rules({ onClose }: { onClose?: () => void }) {
   // On a narrow screen the list of entries is a dropdown above the entry.
   const narrow = useMedia("(max-width: 640px)");
   const back = onClose ? (
-    <button onClick={onClose} style={{ marginBottom: 8 }}>
+    // Opened in play: focus starts here, so Enter goes back (213).
+    <button autoFocus onClick={onClose} style={{ marginBottom: 8 }}>
       Back to the game (Esc)
     </button>
   ) : (
@@ -132,8 +133,14 @@ export function Rules({ onClose }: { onClose?: () => void }) {
                     onClick={() => {
                       setId(e.id);
                     }}
+                    aria-current={e.id === id ? "true" : undefined}
                     style={{
-                      all: "unset",
+                      // A plain link-like button, keeping its focus ring (213).
+                      padding: 0,
+                      border: 0,
+                      background: "none",
+                      font: "inherit",
+                      textAlign: "left",
                       cursor: "pointer",
                       color: e.id === id ? HIGHLIGHT : "#e8e8e8",
                     }}

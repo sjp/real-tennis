@@ -32,8 +32,12 @@ export function Summary({
   const pair = (t: Tally) => `${String(t[you] ?? 0)}–${String(t[them] ?? 0)}`;
   const cell = { padding: "2px 0 2px 16px", textAlign: "right" } as const;
   return (
-    <div style={{ ...centred, padding: "16px 20px", border: `1px solid ${HIGHLIGHT}` }}>
-      <div style={{ fontSize: 18, color: "#ffffff" }}>
+    <div
+      role="dialog"
+      aria-labelledby="summary-title"
+      style={{ ...centred, padding: "16px 20px", border: `1px solid ${HIGHLIGHT}` }}
+    >
+      <div id="summary-title" style={{ fontSize: 18, color: "#ffffff" }}>
         {match.winner === you ? "You won the match" : "Your opponent won the match"}
       </div>
       <div style={{ margin: "4px 0 10px" }}>
@@ -63,7 +67,9 @@ export function Summary({
         Longest rest: {s.longest} {s.longest === 1 ? "stroke" : "strokes"}
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button onClick={onNew}>New match</button>
+        <button autoFocus onClick={onNew}>
+          New match
+        </button>
         <a href="?" style={{ color: HIGHLIGHT }}>
           Menu
         </a>

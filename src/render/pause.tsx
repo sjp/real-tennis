@@ -43,6 +43,8 @@ export function PauseMenu({
     <>
       {ui.menu && (
         <div
+          role="dialog"
+          aria-label="Paused"
           style={{
             ...centred,
             display: "flex",
@@ -54,6 +56,7 @@ export function PauseMenu({
         >
           <div style={{ fontSize: 18, color: "#ffffff", marginBottom: 4 }}>Paused</div>
           <button
+            autoFocus
             style={button}
             onClick={() => {
               ui.setMenu(false);

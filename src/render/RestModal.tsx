@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { RestResult } from "../game/result.ts";
 import { callScore, type Labels } from "../rules/score.ts";
 import { useDismissKeys } from "./dismissKeys.ts";
@@ -28,6 +28,11 @@ export function RestModal({
       clearTimeout(timer);
     };
   }, [result, onDismiss]);
+  // No buttons: focus the dialog, so a screen reader reads it (213).
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    dialog.current?.focus();
+  }, [result]);
   const close = () => {
     if (ready()) onDismiss();
   };
@@ -36,10 +41,13 @@ export function RestModal({
   const winner = sides.find((s) => s.id === result.winner);
   return (
     <div
+      ref={dialog}
       role="dialog"
+      aria-modal="true"
       aria-label={result.title}
+      tabIndex={-1}
       onPointerDown={close}
-      style={{ position: "fixed", inset: 0, zIndex: 20, touchAction: "none" }}
+      style={{ position: "fixed", inset: 0, zIndex: 20, touchAction: "none", outline: "none" }}
     >
       <div
         style={{
