@@ -3,7 +3,7 @@ import { netHeightAt } from "../court/collision.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { kineticEnergy, standardBall } from "./ball.ts";
 import type { SimEvent } from "./events.ts";
-import { vec, ZERO, type Vec3 } from "./vec.ts";
+import { dot, length, madd, normalize, scale, sub, vec, ZERO, type Vec3 } from "./vec.ts";
 import { createWorld, initialState, predict, step, STEP, type SimState } from "./world.ts";
 
 const world = createWorld(court);
@@ -90,6 +90,30 @@ describe("floor bounce", () => {
         s = step(world, s).state;
       expect(s.live && s.asleep).toBe(false);
     }
+  });
+
+  it("ends a slow roller when it slows below the rest speed, before it sleeps", () => {
+    // Struck along the floor, so there is no Fall and no fall-roll timeout.
+    const { after } = until(world, launch(vec(0, r, -5), vec(0, 0, 0.3)), "restOnFloor");
+    const speed = Math.hypot(after.ball.velocity.x, after.ball.velocity.z);
+    expect(after).toMatchObject({ live: false, asleep: false, fallTime: null });
+    expect(speed).toBeGreaterThan(0.01);
+    expect(speed).toBeLessThan(0.05);
+  });
+
+  it("ends a ball half a second after the Fall, while it still rolls fast", () => {
+    let s = launch(vec(0, 0.4, -12), vec(0, 0, 8));
+    const events: SimEvent[] = [];
+    while (!types(events).includes("restOnFloor")) {
+      const r = step(world, s);
+      events.push(...r.events);
+      s = r.state;
+    }
+    const fall = events.find((e) => e.type === "floorBounce" && e.bounce === 2)!;
+    expect(events.at(-1)!.time - fall.time).toBeGreaterThanOrEqual(0.5);
+    expect(events.at(-1)!.time - fall.time).toBeLessThan(0.5 + STEP);
+    expect(length(s.ball.velocity)).toBeGreaterThan(1);
+    expect(s.asleep).toBe(false);
   });
 });
 
@@ -232,6 +256,24 @@ describe("walls", () => {
     expect(Math.min(...path.map((p) => p.y))).toBeGreaterThan(top);
   });
 
+  it("stops a ball barely moving into a wall, without a bounce or an event", () => {
+    const { events, state } = predict(
+      weightless,
+      launch(vec(-hw + r + 0.001, 1, -5), vec(-0.1, 0, 3)),
+      0.2,
+    );
+    expect(events).toEqual([]);
+    // Only the spin the wall put on can push it back in, and only slightly.
+    expect(Math.abs(state.ball.velocity.x)).toBeLessThan(0.001);
+    expect(state.ball.position.x).toBeGreaterThan(-hw + r - 1e-6);
+    const { events: hard } = predict(
+      weightless,
+      launch(vec(-hw + r + 0.001, 1, -5), vec(-1, 0, 3)),
+      0.2,
+    );
+    expect(types(hard)).toEqual(["wallHit"]);
+  });
+
   it("ends the ball's life above the Out of Court Line", () => {
     const { events, state } = predict(world, launch(vec(0, 2, -0.5), vec(0, 14, -12)), 3);
     expect(events[0]).toMatchObject({ type: "outOfCourt" });
@@ -241,11 +283,37 @@ describe("walls", () => {
 });
 
 describe("penthouse", () => {
+  const { edgeHeight: e, wallHeight: w, depth } = court.penthouses;
+  const slope = normalize(vec(-(w - e), depth.side, 0));
+  const edge = vec(hw, e, -5);
+
+  it("reports a ball striking the penthouse edge as an edge hit", () => {
+    // Head-on at the edge, halfway between the bandeau's and the roof's normals.
+    const out = normalize(vec(-1 + slope.x, slope.y, 0));
+    const { events } = predict(weightless, launch(madd(edge, out, 1), scale(out, -10)), 0.5);
+    expect(events[0]).toMatchObject({
+      type: "penthouseHit",
+      edge: true,
+      surface: "penthouseEdge:side",
+    });
+  });
+
+  it("rests a ball on the roof without a bounce or an event, and rolls it down", () => {
+    const start = madd(vec(hw + depth.side / 2, e + (w - e) / 2, -5), slope, r);
+    const { events, state } = predict(world, launch(start, ZERO), 0.3);
+    expect(events).toEqual([]);
+    const p = state.ball.position;
+    expect(p.x).toBeLessThan(start.x - 0.01);
+    expect(p.y).toBeLessThan(start.y);
+    expect(dot(sub(p, edge), slope)).toBeCloseTo(r, 3);
+  });
+
   it("rolls a served ball along the Side Penthouse into the hazard end", () => {
     const serve = launch(vec(hw - 1.5, 1.8, -4), vec(5, 5.5, 5.5), vec(0, 0, 0));
     const { events } = predict(world, serve, 5);
     const roof = events.filter((e) => e.type === "penthouseHit");
     expect(roof.length).toBeGreaterThan(0);
+    expect(roof.map((e) => e.edge)).not.toContain(true);
     const fall = events.find((e) => e.type === "floorBounce")!;
     expect(fall.position.z).toBeGreaterThan(0);
   });
@@ -263,6 +331,18 @@ describe("players", () => {
 });
 
 describe("step", () => {
+  it("only advances the clock for a captured or sleeping ball", () => {
+    const moving = launch(vec(0, 2, -5), vec(0, 3, 10));
+    for (const s of [
+      { ...moving, captured: "dedans" as const, live: false },
+      { ...moving, asleep: true, live: false },
+    ]) {
+      const { state, events } = step(world, s);
+      expect(events).toEqual([]);
+      expect(state).toEqual({ ...s, time: s.time + STEP });
+    }
+  });
+
   it("is deterministic", () => {
     const s = launch(vec(1, 2, -6), vec(3, 4, 18), vec(-50, 20, 10));
     expect(predict(world, s, 4)).toEqual(predict(world, s, 4));

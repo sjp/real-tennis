@@ -41,4 +41,10 @@ describe("hit", () => {
     expect(state).toMatchObject({ live: true, asleep: false, bounces: 0, fallTime: null });
     expect(events).toMatchObject([{ type: "racketHit", player: "a", surface: "racket" }]);
   });
+
+  it("frees a ball held by an opening", () => {
+    const held = { ...initialState(still), live: false, captured: "dedans" as const };
+    const { state } = hit(ball, held, flat);
+    expect(state).toMatchObject({ live: true, captured: null });
+  });
 });
