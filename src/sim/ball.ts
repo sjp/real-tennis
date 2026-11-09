@@ -1,4 +1,4 @@
-import { add, cross, dot, length, madd, normalize, reject, scale, type Vec3 } from "./vec.ts";
+import { dot, vec, type Vec3 } from "./vec.ts";
 
 export interface BallState {
   readonly position: Vec3;
@@ -41,27 +41,59 @@ export function liftCoefficient(spinParameter: number): number {
   return spinParameter > 0 ? 1 / (2 + 1 / spinParameter) : 0;
 }
 
-interface Derivative {
-  readonly velocity: Vec3;
-  readonly acceleration: Vec3;
-  readonly spinRate: Vec3;
-}
+/** The acceleration `accel` last found, kept here rather than in a new object. */
+let ax = 0;
+let ay = 0;
+let az = 0;
 
-/** Gravity, quadratic drag and Magnus lift, plus exponential spin decay. */
-function derivative(p: BallParams, s: BallState): Derivative {
-  const v = s.velocity;
-  const speed = length(v);
+/**
+ * Gravity, quadratic drag and Magnus lift on a ball moving at `v` with spin
+ * `w`, into `ax`, `ay`, `az`. Written out in numbers, not vectors: the sim
+ * spends most of its time here, and the vectors' garbage was half of that.
+ */
+function accel(
+  p: BallParams,
+  vx: number,
+  vy: number,
+  vz: number,
+  wx: number,
+  wy: number,
+  wz: number,
+): void {
+  const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
   const area = Math.PI * p.radius * p.radius;
   const k = (0.5 * p.airDensity * area) / p.mass;
-  let a: Vec3 = { x: 0, y: -p.gravity, z: 0 };
-  if (speed > 0) {
-    a = madd(a, v, -k * p.dragCoefficient * speed);
-    const axis = cross(s.spin, v);
-    const spinAcross = length(reject(s.spin, scale(v, 1 / speed)));
-    const cl = liftCoefficient((p.radius * spinAcross) / speed);
-    if (cl > 0) a = madd(a, normalize(axis), k * cl * speed * speed);
-  }
-  return { velocity: v, acceleration: a, spinRate: scale(s.spin, spinDecayRate(p.spinDecay)) };
+  ax = 0;
+  ay = -p.gravity;
+  az = 0;
+  if (!(speed > 0)) return;
+  const drag = -k * p.dragCoefficient * speed;
+  ax += vx * drag;
+  ay += vy * drag;
+  az += vz * drag;
+  // The spin across the flight: the spin less its part along it.
+  const inv = 1 / speed;
+  const ux = vx * inv;
+  const uy = vy * inv;
+  const uz = vz * inv;
+  const along = -(wx * ux + wy * uy + wz * uz);
+  const rx = wx + ux * along;
+  const ry = wy + uy * along;
+  const rz = wz + uz * along;
+  const spinAcross = Math.sqrt(rx * rx + ry * ry + rz * rz);
+  const cl = liftCoefficient((p.radius * spinAcross) / speed);
+  if (!(cl > 0)) return;
+  // Lift along spin × velocity.
+  const cx = wy * vz - wz * vy;
+  const cy = wz * vx - wx * vz;
+  const cz = wx * vy - wy * vx;
+  const l = Math.sqrt(cx * cx + cy * cy + cz * cz);
+  if (!(l > 0)) return;
+  const lift = k * cl * speed * speed;
+  const il = 1 / l;
+  ax += cx * il * lift;
+  ay += cy * il * lift;
+  az += cz * il * lift;
 }
 
 /** Least fraction of spin kept per second, so the decay rate stays finite. */
@@ -76,34 +108,54 @@ export function spinDecayRate(decay: number): number {
   return Math.log(kept > MIN_SPIN_KEPT ? Math.min(1, kept) : MIN_SPIN_KEPT);
 }
 
-function advance(s: BallState, d: Derivative, dt: number): BallState {
-  return {
-    position: madd(s.position, d.velocity, dt),
-    velocity: madd(s.velocity, d.acceleration, dt),
-    spin: madd(s.spin, d.spinRate, dt),
-  };
-}
-
 /** Advances a ball in free flight by `dt` with RK4. */
 export function flight(p: BallParams, s: BallState, dt: number): BallState {
-  const k1 = derivative(p, s);
-  const k2 = derivative(p, advance(s, k1, dt / 2));
-  const k3 = derivative(p, advance(s, k2, dt / 2));
-  const k4 = derivative(p, advance(s, k3, dt));
-  const sum = (f: (d: Derivative) => Vec3) =>
-    scale(add(add(f(k1), scale(add(f(k2), f(k3)), 2)), f(k4)), dt / 6);
+  const rate = spinDecayRate(p.spinDecay);
+  const half = dt / 2;
+  const { x: px, y: py, z: pz } = s.position;
+  // Each stage's velocity v, acceleration a and spin w; the spin's rate is w·rate.
+  const { x: v1x, y: v1y, z: v1z } = s.velocity;
+  const { x: w1x, y: w1y, z: w1z } = s.spin;
+  accel(p, v1x, v1y, v1z, w1x, w1y, w1z);
+  const [a1x, a1y, a1z] = [ax, ay, az];
+  const [v2x, v2y, v2z] = [v1x + a1x * half, v1y + a1y * half, v1z + a1z * half];
+  const [w2x, w2y, w2z] = [
+    w1x + w1x * rate * half,
+    w1y + w1y * rate * half,
+    w1z + w1z * rate * half,
+  ];
+  accel(p, v2x, v2y, v2z, w2x, w2y, w2z);
+  const [a2x, a2y, a2z] = [ax, ay, az];
+  const [v3x, v3y, v3z] = [v1x + a2x * half, v1y + a2y * half, v1z + a2z * half];
+  const [w3x, w3y, w3z] = [
+    w1x + w2x * rate * half,
+    w1y + w2y * rate * half,
+    w1z + w2z * rate * half,
+  ];
+  accel(p, v3x, v3y, v3z, w3x, w3y, w3z);
+  const [a3x, a3y, a3z] = [ax, ay, az];
+  const [v4x, v4y, v4z] = [v1x + a3x * dt, v1y + a3y * dt, v1z + a3z * dt];
+  const [w4x, w4y, w4z] = [w1x + w3x * rate * dt, w1y + w3y * rate * dt, w1z + w3z * rate * dt];
+  accel(p, v4x, v4y, v4z, w4x, w4y, w4z);
+  const [a4x, a4y, a4z] = [ax, ay, az];
+  const sixth = dt / 6;
+  const sum = (k1: number, k2: number, k3: number, k4: number) => (k1 + (k2 + k3) * 2 + k4) * sixth;
+  const r = rate;
   return {
-    position: add(
-      s.position,
-      sum((d) => d.velocity),
+    position: vec(
+      px + sum(v1x, v2x, v3x, v4x),
+      py + sum(v1y, v2y, v3y, v4y),
+      pz + sum(v1z, v2z, v3z, v4z),
     ),
-    velocity: add(
-      s.velocity,
-      sum((d) => d.acceleration),
+    velocity: vec(
+      v1x + sum(a1x, a2x, a3x, a4x),
+      v1y + sum(a1y, a2y, a3y, a4y),
+      v1z + sum(a1z, a2z, a3z, a4z),
     ),
-    spin: add(
-      s.spin,
-      sum((d) => d.spinRate),
+    spin: vec(
+      w1x + sum(w1x * r, w2x * r, w3x * r, w4x * r),
+      w1y + sum(w1y * r, w2y * r, w3y * r, w4y * r),
+      w1z + sum(w1z * r, w2z * r, w3z * r, w4z * r),
     ),
   };
 }
