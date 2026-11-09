@@ -194,7 +194,8 @@ export function collisionGeometry(court: CourtDefinition): CollisionPrimitive[] 
     }
     for (const o of openings) {
       const r = o.rect;
-      for (const end of o.joues) {
+      // A joue with no depth has no face.
+      for (const end of o.depth > 0 ? o.joues : []) {
         const u = r[end];
         const inward = end === "u0" ? 1 : -1;
         const along = wall === "side" ? v(0, 0, inward) : v(inward, 0, 0);

@@ -68,6 +68,18 @@ describe("collisionGeometry", () => {
       "joue:winningGallery",
     ]);
   });
+
+  it("gives an opening with no depth no joues (195)", () => {
+    const flat = {
+      ...court,
+      openings: court.openings.map((o) => (o.id === "dedans" ? { ...o, depth: 0 } : o)),
+    };
+    const surfaces = collisionGeometry(flat)
+      .filter((p) => p.kind === "polygon")
+      .map((p) => p.surface);
+    expect(surfaces).not.toContain("joue:dedans");
+    expect(surfaces).toContain("joue:grille");
+  });
 });
 
 describe("netHeightAt", () => {

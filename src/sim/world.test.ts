@@ -27,6 +27,26 @@ function until(w: typeof world, s: SimState, type: SimEvent["type"]) {
   throw new Error(`no ${type}`);
 }
 
+describe("createWorld", () => {
+  it("accepts the standard court", () => {
+    expect(world.bodies.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a zero-area polygon (195)", () => {
+    // No projection: the tambour's angled face collapses to a line.
+    const flat = { ...court, tambour: { ...court.tambour, projection: 0 } };
+    expect(() => createWorld(flat)).toThrow(/no area/);
+  });
+
+  it("rejects a zero-length segment (195)", () => {
+    // A flat post-less opening with no height has zero-length ends.
+    const openings = court.openings.map((o) =>
+      o.id === "dedans" ? { ...o, joues: [], depth: 0, rect: { ...o.rect, y1: o.rect.y0 } } : o,
+    );
+    expect(() => createWorld({ ...court, openings })).toThrow(/no length/);
+  });
+});
+
 describe("floor bounce", () => {
   it("rebounds a dropped ball to about COR² of its height", () => {
     const { events, path } = predict(world, launch(vec(0, 2, -5), ZERO), 1.5);

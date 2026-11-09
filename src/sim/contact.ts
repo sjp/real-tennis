@@ -98,6 +98,7 @@ function sweepRoot(w: Vec3, d: Vec3, r: number): number | null {
 export function sweepSegment(p0: Vec3, d: Vec3, a: Vec3, b: Vec3, r: number): number | null {
   const ab = sub(b, a);
   const len2 = lengthSq(ab);
+  if (len2 === 0) return sweepPoint(p0, d, a, r);
   const u = scale(ab, 1 / Math.sqrt(len2));
   const w = sub(p0, a);
   let best = sweepRoot(reject(w, u), reject(d, u), r);
@@ -115,6 +116,8 @@ export function sweepSegment(p0: Vec3, d: Vec3, a: Vec3, b: Vec3, r: number): nu
 /** The point on segment a–b closest to `p`. */
 export function closestOnSegment(p: Vec3, a: Vec3, b: Vec3): Vec3 {
   const ab = sub(b, a);
-  const t = Math.min(1, Math.max(0, dot(sub(p, a), ab) / lengthSq(ab)));
+  const len2 = lengthSq(ab);
+  if (len2 === 0) return a;
+  const t = Math.min(1, Math.max(0, dot(sub(p, a), ab) / len2));
   return madd(a, ab, t);
 }

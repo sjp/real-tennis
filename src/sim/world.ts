@@ -77,6 +77,10 @@ export interface World {
   readonly bodies: readonly Body[];
 }
 
+/** Below this a polygon (m²) or segment (m) is degenerate. */
+const MIN_AREA = 1e-9;
+const MIN_LENGTH = 1e-6;
+
 /** Number of straight pieces approximating the net cord's sag. */
 const CORD_PIECES = 24;
 
@@ -95,7 +99,10 @@ function polygonEdges(vertices: readonly Vec3[], normal: Vec3): Edge[] {
   vertices.forEach((v, i) => {
     winding = madd(winding, cross(v, vertices[(i + 1) % vertices.length]!), 1);
   });
-  const sign = Math.sign(dot(winding, normal));
+  // Twice the area: a polygon with none would be inside everywhere.
+  const area2 = dot(winding, normal);
+  if (!(Math.abs(area2) > MIN_AREA)) throw new Error("Collision polygon has no area");
+  const sign = Math.sign(area2);
   return vertices.map((a, i) => ({
     a,
     inward: scale(cross(normal, sub(vertices[(i + 1) % vertices.length]!, a)), sign),
@@ -126,6 +133,8 @@ export function createWorld(
         break;
       }
       case "segment":
+        if (!(length(sub(p.b, p.a)) > MIN_LENGTH))
+          throw new Error("Collision segment has no length");
         bodies.push({ ...p, cord: false, ...bounds([p.a, p.b], r) });
         break;
       case "net": {

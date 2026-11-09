@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { standardBall as ball } from "./ball.ts";
-import { collide, sweepPlane, sweepSegment } from "./contact.ts";
+import { closestOnSegment, collide, sweepPlane, sweepSegment } from "./contact.ts";
 import { cross, scale, vec, ZERO } from "./vec.ts";
 
 const UP = vec(0, 1, 0);
@@ -40,6 +40,17 @@ describe("sweepSegment", () => {
 
   it("misses a ball passing beyond the end", () => {
     expect(sweepSegment(vec(-1, 1 + 2 * r, 0), vec(2, 0, 0), a, b, r)).toBeNull();
+  });
+
+  it("treats a zero-length edge as a point (195)", () => {
+    expect(sweepSegment(vec(-1, 0, 0), vec(2, 0, 0), a, a, r)).toBeCloseTo(0.45);
+    expect(sweepSegment(vec(-1, 1, 0), vec(2, 0, 0), a, a, r)).toBeNull();
+  });
+});
+
+describe("closestOnSegment", () => {
+  it("is the point itself for a zero-length segment (195)", () => {
+    expect(closestOnSegment(vec(1, 2, 3), UP, UP)).toEqual(UP);
   });
 });
 
