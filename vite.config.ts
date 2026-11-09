@@ -26,10 +26,6 @@ export default defineConfig(({ command, isPreview }) => ({
   base: command === "build" || isPreview ? "/real-tennis/" : "/",
   test: {
     testTimeout: 10_000,
-    // No test mocks modules, and tests that stub globals or spy on them
-    // restore them afterwards, so files can share workers; this saves about
-    // a third of the run.
-    isolate: false,
     // Node 25+ exposes a localStorage global that warns on first use unless
     // --localstorage-file is given. Turn it off: the stores already fall back
     // when storage is missing, and the warning is only noise.
