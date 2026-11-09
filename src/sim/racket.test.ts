@@ -42,6 +42,17 @@ describe("hit", () => {
     expect(events).toMatchObject([{ type: "racketHit", player: "a", surface: "racket" }]);
   });
 
+  it("does nothing and reports nothing if the racket isn't closing on the ball (195)", () => {
+    const s = initialState(still);
+    expect(hit(ball, s, { ...flat, velocity: vec(0, 0, -5) })).toEqual({ state: s, events: [] });
+  });
+
+  it("does nothing with a zero or non-unit normal (195)", () => {
+    const s = initialState(still);
+    expect(hit(ball, s, { ...flat, normal: ZERO }).events).toEqual([]);
+    expect(hit(ball, s, { ...flat, normal: vec(0, 0, 2) }).events).toEqual([]);
+  });
+
   it("frees a ball held by an opening", () => {
     const held = { ...initialState(still), live: false, captured: "dedans" as const };
     const { state } = hit(ball, held, flat);

@@ -1,6 +1,6 @@
 import type { BallParams, BallState } from "./ball.ts";
 import { collide } from "./contact.ts";
-import type { Vec3 } from "./vec.ts";
+import { dot, length, sub, type Vec3 } from "./vec.ts";
 import type { SimState, StepResult } from "./world.ts";
 
 export interface Racket {
@@ -46,13 +46,25 @@ export function racketImpact(
   );
 }
 
-/** Applies a racket hit to the simulation, starting a new shot. */
+/** Whether `racket` can strike `ball`: a unit normal, and closing on it. */
+export function makesContact(ball: BallState, racket: Racket): boolean {
+  return (
+    Math.abs(length(racket.normal) - 1) < 1e-6 &&
+    dot(sub(ball.velocity, racket.velocity), racket.normal) < 0
+  );
+}
+
+/**
+ * Applies a racket hit to the simulation, starting a new shot. A racket that
+ * can't strike the ball (see `makesContact`) changes nothing and reports nothing.
+ */
 export function hit(
   p: BallParams,
   state: SimState,
   racket: Racket,
   params: RacketParams = standardRacket,
 ): StepResult {
+  if (!makesContact(state.ball, racket)) return { state, events: [] };
   const ball = racketImpact(p, state.ball, racket, params);
   return {
     state: {

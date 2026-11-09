@@ -280,15 +280,19 @@ export function act(
         ? planServe(world, a.id, SERVE_STYLES[a.serveStyle]!, ball, a.end, input.move, timed.timing)
         : planShot(world, a.id, a.shot, ball, a.end, input.move, timed.timing).racket;
       const struck = hit(world.ball, sim, racket);
-      events.push(...struck.events);
-      judged.push(...struck.events);
-      notices.push({
-        type: "shot",
-        shot: serving ? SERVE_STYLES[a.serveStyle]!.name : a.shot,
-        timing: timed.timing,
-      });
-      sim = struck.state;
-      a = { ...a, serve: null, struck: sim.time };
+      // A racket that can't meet the ball misses it (195).
+      if (struck.events.length === 0) notices.push({ type: "whiff" });
+      else {
+        events.push(...struck.events);
+        judged.push(...struck.events);
+        notices.push({
+          type: "shot",
+          shot: serving ? SERVE_STYLES[a.serveStyle]!.name : a.shot,
+          timing: timed.timing,
+        });
+        sim = struck.state;
+        a = { ...a, serve: null, struck: sim.time };
+      }
     }
   }
 
@@ -307,11 +311,13 @@ export function act(
     };
     const racket = planShot(world, a.id, a.shot, sim.ball, a.end, input.move, auto.timing).racket;
     const struck = hit(world.ball, sim, racket);
-    events.push(...struck.events);
-    judged.push(...struck.events);
-    notices.push({ type: "shot", shot: a.shot, timing: auto.timing });
-    sim = struck.state;
-    a = { ...a, struck: sim.time };
+    if (struck.events.length > 0) {
+      events.push(...struck.events);
+      judged.push(...struck.events);
+      notices.push({ type: "shot", shot: a.shot, timing: auto.timing });
+      sim = struck.state;
+      a = { ...a, struck: sim.time };
+    }
   }
   if (a.swing && sim.time >= a.swing.start + SWING_TIME + FOLLOW_THROUGH) a = { ...a, swing: null };
 
