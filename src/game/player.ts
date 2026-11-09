@@ -152,8 +152,9 @@ function swingPath(world: World, sim: SimState): readonly Vec3[] {
   return predict(world, sim, SWING_TIME + POOR + 0.05).path;
 }
 
+/** Picks shot or serve style `n`, counting from 1; out of range, it changes nothing. */
 function select(a: Athlete, n: number | null): Athlete {
-  if (n === null) return a;
+  if (n === null || n < 1) return a;
   if (a.serve !== null) return n <= SERVE_STYLES.length ? { ...a, serveStyle: n - 1 } : a;
   return n <= SHOT_TYPES.length ? { ...a, shot: SHOT_TYPES[n - 1]! } : a;
 }
