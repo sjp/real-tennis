@@ -7,7 +7,7 @@ import { ENTRIES, TOPICS, type Entry } from "../teach/reference.ts";
 import { Court } from "./Court.tsx";
 import { useMedia, useReducedMotion } from "./media.ts";
 import { Highlight } from "./teach.tsx";
-import { DPR, HIGHLIGHT } from "./view.ts";
+import { DPR, HIGHLIGHT, page } from "./view.ts";
 
 const POINTS: readonly [string, string][] = [
   ["No points", "Love"],
@@ -89,13 +89,10 @@ export function Rules({ onClose }: { onClose?: () => void }) {
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
+        ...page,
         display: "flex",
         flexWrap: "wrap",
         alignContent: "flex-start",
-        overflow: "auto",
-        background: "#101418",
         color: "#e8e8e8",
         font: "14px/1.6 ui-monospace, monospace",
       }}

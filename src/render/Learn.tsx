@@ -27,7 +27,7 @@ import { settings, useSettings } from "./settings.ts";
 import { hear } from "../audio/engine.ts";
 import { OPPONENT_ID, PLAYER_ID } from "../game/ids.ts";
 import { length } from "../sim/vec.ts";
-import { describeNotice, HIGHLIGHT, hudPanel, centred, FPS } from "./view.ts";
+import { describeNotice, HIGHLIGHT, hudPanel, centred, FPS, page } from "./view.ts";
 import { FpsMeter } from "./Fps.tsx";
 import { BALL_JUMP, blendAthlete, blendTime, blendVec, createBlend, type Blend } from "./blend.ts";
 import {
@@ -457,7 +457,7 @@ export function Learn() {
 /** The lessons, each with a tick once done. */
 function List({ done, onOpen }: { done: readonly string[]; onOpen: (i: number) => void }) {
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#101418" }}>
+    <div style={page}>
       <div
         style={{
           maxWidth: 560,

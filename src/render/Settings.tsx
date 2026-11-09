@@ -3,7 +3,7 @@ import { reset, toggle } from "../teach/explain.ts";
 import { createExplainStore, useExplainer } from "./explainStore.ts";
 import { loadDone, saveDone } from "./progress.ts";
 import { settings, useSettings } from "./settings.ts";
-import { HIGHLIGHT } from "./view.ts";
+import { HIGHLIGHT, page } from "./view.ts";
 import { TouchSetting } from "./TouchSetting.tsx";
 import { Volume } from "./Volume.tsx";
 
@@ -23,7 +23,7 @@ export function Settings() {
   const ex = useExplainer(explain);
   const [lessons, setLessons] = useState(() => loadDone().length);
   return (
-    <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#101418" }}>
+    <div style={page}>
       <div
         style={{
           maxWidth: 560,
