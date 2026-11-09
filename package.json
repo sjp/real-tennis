@@ -12,7 +12,8 @@
     "test": "vitest run --passWithNoTests",
     "ai:stats": "node scripts/ai-stats.ts",
     "icons": "node scripts/icons.ts",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "bundle:budget": "node scripts/bundle-budget.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
