@@ -53,7 +53,8 @@ export function restResult(
     const receiver = receiverOf(m);
     return {
       ...won(receiver, `Double fault: point to ${labels[receiver]!}`),
-      why: TEACHING.doubleFault.text,
+      // Name the second fault, e.g. "Double fault: the service hit the Main Wall…".
+      why: `Double fault: ${why.replace(/^Fault: /, "")}. Two faults in a row lose the point`,
     };
   }
   return { winner: null, title: TITLES[outcome.kind], why, note: NOTES[outcome.kind], match };

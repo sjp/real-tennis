@@ -37,9 +37,11 @@ describe("restResult", () => {
     const first = restResult(start, fault, [], labels);
     expect(first).toMatchObject({ winner: null, title: "Fault" });
     expect(first.note).toMatch(/one fault stands/);
-    const second = restResult(first.match, fault, [], labels);
+    const second = restResult(first.match, { kind: "fault", reason: "faultMainWall" }, [], labels);
     expect(second).toMatchObject({ winner: AI, title: "Double fault: point to Opponent" });
-    expect(second.why).toBe("Two faults in a row: the server loses the rest");
+    expect(second.why).toBe(
+      "Double fault: the service hit the Main Wall or the Tambour before dropping. Two faults in a row lose the point",
+    );
     expect(second.match.points[AI]).toBe(1);
   });
 
