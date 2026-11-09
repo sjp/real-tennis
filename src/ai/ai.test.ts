@@ -2,13 +2,22 @@ import { describe, expect, it } from "vitest";
 import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts";
-import { playerCapsule } from "../game/player.ts";
+import { playerCapsule, serveMiss, type Athlete } from "../game/player.ts";
 import { IDLE, type InputState } from "../input/input.ts";
+import { SERVE_STYLES, serveSpot, toss } from "../player/serve.ts";
 import { aimAt } from "../player/shot.ts";
 import { startRally } from "../rules/rally.ts";
 import { vec, ZERO } from "../sim/vec.ts";
-import { createWorld, initialState } from "../sim/world.ts";
-import { aiInput, FRESH, outcomeValue, type AiMemory } from "./ai.ts";
+import { createWorld, initialState, predict, STEP } from "../sim/world.ts";
+import {
+  aiInput,
+  basePosition,
+  FRESH,
+  gaussian,
+  outcomeValue,
+  serveContact,
+  type AiMemory,
+} from "./ai.ts";
 import { seeded, viewOf } from "./headless.ts";
 import { AI_PRESETS, type AiPreset } from "./presets.ts";
 
@@ -76,6 +85,18 @@ describe("the AI", () => {
     expect(good.length).toBeGreaterThanOrEqual(8);
   });
 
+  it("serves just as well when player b wins the toss", () => {
+    // `seeded` gives player a the toss for every small seed (235), so force it.
+    const b = startPlay(world, config, () => 0.9, labels).state;
+    expect(b.match.server).toBe("b");
+    const serves = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seed) =>
+      play(b, "b", AI_PRESETS.hard, seed),
+    );
+    expect(serves.every((s) => s.hits[0] === "b")).toBe(true);
+    const good = serves.filter((s) => s.calls.includes("goodService"));
+    expect(good.length).toBeGreaterThanOrEqual(8);
+  });
+
   it("returns a good service", () => {
     // The human's Railroad, served perfectly from the practice tests' timing.
     const returned = [1, 2, 3, 4, 5, 6].filter((seed) => {
@@ -134,4 +155,56 @@ describe("the AI", () => {
       call: { mark: { side: "hazard" } },
     });
   });
+});
+
+describe("gaussian", () => {
+  it("is 0 when the first draw is 0", () => {
+    const draws = [0, 0.3];
+    expect(gaussian(() => draws.shift()!)).toBe(0);
+  });
+
+  it("has mean 0 and spread 1, and stays finite at the ends of [0, 1)", () => {
+    const random = seeded(42);
+    const xs = Array.from({ length: 20_000 }, () => gaussian(random));
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const variance = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length;
+    expect(Math.abs(mean)).toBeLessThan(0.05);
+    expect(variance).toBeGreaterThan(0.9);
+    expect(variance).toBeLessThan(1.1);
+    expect(Number.isFinite(gaussian(() => 1 - Number.EPSILON))).toBe(true);
+  });
+});
+
+describe("basePosition", () => {
+  const hl = court.floor.length / 2;
+
+  it("waits in the middle of its own end, 5 m from the end wall", () => {
+    expect(basePosition(world, "service")).toEqual({ x: 0.5, z: -(hl - 5) });
+    expect(basePosition(world, "hazard")).toEqual({ x: 0.5, z: hl - 5 });
+  });
+});
+
+describe("serveContact", () => {
+  it.each(SERVE_STYLES.map((s, i) => [s.name, i] as const))(
+    "meets a tossed %s at the serving hand",
+    (_, serveStyle) => {
+      const me: Athlete = {
+        id: "a",
+        motion: { position: serveSpot(court), velocity: { x: 0, z: 0 } },
+        end: "service",
+        shot: "cut",
+        serveStyle,
+        swing: null,
+        serve: "tossed",
+        struck: null,
+      };
+      const style = SERVE_STYLES[serveStyle]!;
+      const sim = initialState(toss(style, me.motion.position, "service", world.ball.gravity), 3);
+      const t = serveContact(world, me, sim);
+      expect(t).toBeGreaterThan(3);
+      expect(t).toBeLessThan(5);
+      const ball = predict(world, sim, 2).path[Math.round((t - 3) / STEP)]!;
+      expect(serveMiss(me, ball)).toBeLessThan(0.02);
+    },
+  );
 });
