@@ -3,7 +3,7 @@ import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { playRest, startMatch, type MatchState } from "./match.ts";
 import type { RallyOutcome } from "./rally.ts";
-import { callChase, callScore, pointsShown } from "./score.ts";
+import { callChase, callGames, callPoints, callScore, callSets, pointsShown } from "./score.ts";
 
 const H = "human";
 const AI = "ai";
@@ -57,6 +57,54 @@ describe("callScore", () => {
     const sudden = { ...start, config: { ...start.config, suddenDeath: true } };
     const m = after([H, H, H, AI, AI, AI].map(win), sudden);
     expect(callScore(m, labels)).toBe("Forty all");
+  });
+});
+
+describe("callPoints", () => {
+  const points = (h: number, ai: number, lastPoint: string | null) =>
+    callPoints({ ...start, points: { [H]: h, [AI]: ai }, lastPoint }, labels);
+
+  it("calls the server's score first before any point is won", () => {
+    expect(points(0, 0, null)).toBe("Love all");
+    const serving = { ...start, server: AI, points: { [H]: 0, [AI]: 2 } };
+    expect(callPoints(serving, labels)).toBe("Thirty–love");
+  });
+
+  it("calls the last winner's score first, even when behind (Law 12.1)", () => {
+    expect(points(1, 3, H)).toBe("Fifteen–forty");
+    expect(points(1, 3, AI)).toBe("Forty–fifteen");
+  });
+
+  it("calls deuce, and the advantage by role, however far the game goes", () => {
+    expect(points(5, 5, AI)).toBe("Deuce");
+    expect(points(6, 5, AI)).toBe("Advantage Player");
+    expect(points(5, 6, AI)).toBe("Advantage Opponent");
+  });
+});
+
+describe("callGames and callSets", () => {
+  const m = (t: Partial<MatchState>) => ({ ...start, ...t });
+
+  it("say nothing at love all", () => {
+    expect(callGames(start)).toBe("");
+    expect(callSets(start)).toBe("");
+  });
+
+  it("call the leader's tally first, whoever won the last game", () => {
+    const games = { [H]: 1, [AI]: 4 };
+    expect(callGames(m({ games, lastGame: AI }))).toBe("Four games to one");
+    expect(callGames(m({ games, lastGame: H }))).toBe("Four games to one");
+  });
+
+  it("use the singular only when the lead is one", () => {
+    expect(callGames(m({ games: { [H]: 1, [AI]: 0 }, lastGame: H }))).toBe("One game to love");
+    expect(callGames(m({ games: { [H]: 1, [AI]: 1 }, lastGame: H }))).toBe("One game all");
+    expect(callGames(m({ games: { [H]: 6, [AI]: 6 }, lastGame: AI }))).toBe("Six games all");
+  });
+
+  it("count sets the same way", () => {
+    expect(callSets(m({ sets: { [H]: 2, [AI]: 1 }, lastGame: H }))).toBe("Two sets to one");
+    expect(callSets(m({ sets: { [H]: 1, [AI]: 1 }, lastGame: AI }))).toBe("One set all");
   });
 });
 
