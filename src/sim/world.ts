@@ -85,6 +85,55 @@ export interface World {
   readonly ball: BallParams;
   readonly materials: Materials;
   readonly bodies: readonly Body[];
+  /** The bodies by floor cell, so a step only tests those near the ball. */
+  readonly grid: Grid;
+}
+
+/** Floor cells (x, z) each listing the bodies whose bounds reach into it. */
+interface Grid {
+  readonly x0: number;
+  readonly z0: number;
+  readonly nx: number;
+  readonly nz: number;
+  readonly cells: readonly (readonly Body[])[];
+}
+
+/** A grid cell's side, in m. */
+const CELL = 1;
+
+function makeGrid(bodies: readonly Body[]): Grid {
+  const x0 = Math.floor(Math.min(...bodies.map((b) => b.min.x)));
+  const z0 = Math.floor(Math.min(...bodies.map((b) => b.min.z)));
+  const nx = Math.ceil((Math.max(...bodies.map((b) => b.max.x)) - x0) / CELL) + 1;
+  const nz = Math.ceil((Math.max(...bodies.map((b) => b.max.z)) - z0) / CELL) + 1;
+  const cells: Body[][] = Array.from({ length: nx * nz }, () => []);
+  // In the bodies' own order, so the first of two equal hits is unchanged.
+  for (const b of bodies) {
+    const [i0, i1] = [b.min.x, b.max.x].map((x) => Math.floor((x - x0) / CELL));
+    const [k0, k1] = [b.min.z, b.max.z].map((z) => Math.floor((z - z0) / CELL));
+    for (let i = i0!; i <= i1!; i++) for (let k = k0!; k <= k1!; k++) cells[i * nz + k]!.push(b);
+  }
+  return { x0, z0, nx, nz, cells };
+}
+
+/**
+ * The bodies a sweep from `p0` to `p1` could touch: those of its cell when
+ * it stays in one, otherwise all of them.
+ */
+function near(world: World, p0: Vec3, p1: Vec3): readonly Body[] {
+  const { x0, z0, nx, nz, cells } = world.grid;
+  const i = Math.floor((p0.x - x0) / CELL);
+  const k = Math.floor((p0.z - z0) / CELL);
+  if (
+    i < 0 ||
+    k < 0 ||
+    i >= nx ||
+    k >= nz ||
+    i !== Math.floor((p1.x - x0) / CELL) ||
+    k !== Math.floor((p1.z - z0) / CELL)
+  )
+    return world.bodies;
+  return cells[i * nz + k]!;
 }
 
 /** Below this a polygon (m²) or segment (m) is degenerate. */
@@ -166,7 +215,7 @@ export function createWorld(
       }
     }
   }
-  return { court, ball, materials, bodies };
+  return { court, ball, materials, bodies, grid: makeGrid(bodies) };
 }
 
 export interface SimState {
@@ -279,7 +328,7 @@ function firstHit(
 ): Hit | null {
   const d = sub(p1, p0);
   let best: Hit | null = null;
-  for (const body of world.bodies) {
+  for (const body of near(world, p0, p1)) {
     if (skip.has(body) || !overlaps(body, p0, p1)) continue;
     const s = sweepBody(world, body, p0, d);
     if (s !== null && (best === null || s < best.s)) best = { s, body };
