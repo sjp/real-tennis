@@ -330,6 +330,13 @@ describe("losing the rest (Law 11.2)", () => {
     });
   });
 
+  it("(c) a ball struck along the floor, touching the striker's side (193)", () => {
+    expect(outcome([...returned, bounce(0, 2.5), net("hazard")])).toMatchObject({
+      winner: S,
+      reason: "notOverNet",
+    });
+  });
+
   it("(c) entering an opening, or hitting the net post, before passing the net", () => {
     expect(outcome([...returned, opening("hazardDoor")])).toMatchObject({
       winner: S,

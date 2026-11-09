@@ -322,6 +322,14 @@ export function step(
       });
   };
 
+  const touchFloor = (at: { time: number; position: Vec3 }) => {
+    s.bounces += 1;
+    emit({ ...at, type: "floorBounce", bounce: s.bounces, surface: "floor" });
+    if (s.bounces === 2) s.fallTime = s.time;
+    if (s.time - s.lastWallTime <= NICK_WINDOW) emit({ ...at, type: "nick", surface: "floor" });
+    s.lastFloorTime = s.time;
+  };
+
   for (let i = 0; i < 8 && remaining > 0; i++) {
     const next = flight(p, ball, remaining);
     const hit = firstHit(world, ball.position, next.position, skip, players);
@@ -361,7 +369,11 @@ export function step(
     const material = materialFor(world.materials, body);
     if (approach < RESTING_CONTACT) {
       ball = collide(p, ball, n, { ...material, restitution: 0 });
-      if ("kind" in body && body.surface === "floor") rolling = true;
+      if ("kind" in body && body.surface === "floor") {
+        rolling = true;
+        // A ball struck along the floor still touches it (193).
+        if (s.bounces === 0) touchFloor(at);
+      }
       continue;
     }
     ball = collide(p, ball, n, material);
@@ -373,11 +385,7 @@ export function step(
     }
     const surface = body.surface;
     if (surface === "floor") {
-      s.bounces += 1;
-      emit({ ...at, type: "floorBounce", bounce: s.bounces, surface });
-      if (s.bounces === 2) s.fallTime = s.time;
-      if (s.time - s.lastWallTime <= NICK_WINDOW) emit({ ...at, type: "nick", surface });
-      s.lastFloorTime = s.time;
+      touchFloor(at);
     } else if (surface === "net") {
       const cord = body.kind === "segment";
       emit({ ...at, type: "netHit", face: n.z < 0 ? "service" : "hazard", cord, surface });
@@ -418,6 +426,11 @@ export function step(
     if (slowed < SLEEP_SPEED) {
       ball = { position: { ...ball.position, y: p.radius }, velocity: ZERO, spin: ZERO };
       s.asleep = true;
+      // A ball at rest can't be live: say so, whatever its bounces (193).
+      if (s.live) {
+        emit({ time: s.time, position: ball.position, type: "restOnFloor", surface: "floor" });
+        s.live = false;
+      }
     }
   }
   if (s.live && s.fallTime !== null && s.time - s.fallTime >= FALL_ROLL) {

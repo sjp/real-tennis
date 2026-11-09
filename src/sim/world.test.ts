@@ -64,6 +64,33 @@ describe("floor bounce", () => {
     expect(state.asleep).toBe(true);
     expect(state.ball.position.y).toBeCloseTo(r, 3);
   });
+
+  it("counts a ball struck along the floor as touching it, and ends it (193)", () => {
+    for (const vy of [0, 0.1]) {
+      const { events, state } = predict(world, launch(vec(0, r, -5), vec(0, vy, 4)), 10);
+      expect(events[0]).toMatchObject({ type: "floorBounce", bounce: 1 });
+      expect(events[0]!.position.z).toBeLessThan(0);
+      expect(types(events).at(-1)).toBe("restOnFloor");
+      expect(state).toMatchObject({ live: false, asleep: true });
+    }
+  });
+
+  it("never leaves a live ball asleep (193)", () => {
+    let seed = 7;
+    const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const between = (lo: number, hi: number) => lo + random() * (hi - lo);
+    for (let i = 0; i < 60; i++) {
+      const low = i % 2 === 0;
+      let s = launch(
+        vec(between(-hw + 1, hw - 1), low ? r : between(0.5, 3), between(-hl + 1, hl - 1)),
+        vec(between(-6, 6), low ? 0 : between(-5, 8), between(-15, 15)),
+        vec(between(-200, 200), between(-200, 200), between(-200, 200)),
+      );
+      for (let t = 0; t < 8 / STEP && !s.asleep && s.captured === null; t++)
+        s = step(world, s).state;
+      expect(s.live && s.asleep).toBe(false);
+    }
+  });
 });
 
 describe("net", () => {
