@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts";
-import { playerCapsule, serveMiss, type Athlete } from "../game/player.ts";
+import { playerCapsule, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
+import { forwardZ } from "../player/movement.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { SERVE_STYLES, serveSpot, toss } from "../player/serve.ts";
 import { aimAt } from "../player/shot.ts";
@@ -159,6 +160,30 @@ describe("the AI", () => {
   });
 });
 
+describe("planning a stroke", () => {
+  const start = startPlay(world, config, () => 0.2, labels).state;
+
+  it("never plans a contact closer than SWING_TIME", () => {
+    // A ball that has dropped, rising gently just in front of the receiver's
+    // forehand: in reach from now until well after SWING_TIME.
+    const b = athleteOf(start, "b");
+    const me: Athlete = {
+      ...b,
+      serve: null,
+      motion: { position: { x: 1, z: 6 }, velocity: { x: 0, z: 0 } },
+    };
+    const f = forwardZ(me.end);
+    const from = vec(1 + rightX(me.end) * SIDE_REACH, 0.9, 6 + f * 0.3);
+    const sim = initialState({ position: from, velocity: vec(0, 1.5, 0), spin: ZERO }, 3);
+    const rally = { ...startRally(start.rally.setup, "a"), crossed: true, drop: "hazard" as const };
+    const sure = { ...AI_PRESETS.hard, reaction: 0, timing: 0, noise: 0, judgement: 0 };
+    const view = { me, sim, rally, live: true, since: 0 };
+    const { memory } = aiInput(world, view, sure, FRESH, seeded(1), playerCapsule(me));
+    // With perfect timing it swings SWING_TIME before contact: not before now.
+    expect(memory.plan?.swingAt).toBeGreaterThanOrEqual(3);
+  });
+});
+
 describe("gaussian", () => {
   it("is 0 when the first draw is 0", () => {
     const draws = [0, 0.3];
@@ -258,4 +283,25 @@ describe("the AI's input", () => {
     expect(longest).toBeGreaterThan(0.5);
     expect(longest).toBeLessThanOrEqual(1 + 1e-12);
   });
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
+    "never plans a contact it can't swing at in time (seed %i)",
+    (seed) => {
+      // With perfect timing, a plan swings exactly SWING_TIME before its contact.
+      const exact = (p: AiPreset) => ({ ...p, timing: 0 });
+      const pair = pairs[seed % pairs.length]!;
+      const presets = { a: exact(pair.a), b: exact(pair.b) };
+      let plans = 0;
+      const last: Record<string, unknown> = {};
+      watch(presets, seed, 40, (view, _, memory) => {
+        const plan = memory.plan;
+        if (plan === last[view.me.id]) return;
+        last[view.me.id] = plan;
+        if (plan?.swingAt == null) return;
+        plans++;
+        expect(plan.swingAt).toBeGreaterThanOrEqual(view.sim.time - 1e-9);
+      });
+      expect(plans).toBeGreaterThan(3);
+    },
+  );
 });

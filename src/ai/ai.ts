@@ -333,7 +333,8 @@ function makePlan(
     if (!legal) continue;
     const stands = [false, true].map((b) => standFor(p, me.end, b));
     const stand = dist(stands[0]!) <= dist(stands[1]!) + 0.5 ? stands[0]! : stands[1]!;
-    if (runTime(dist(stand), speed) + SPARE > t - now) continue;
+    // Too soon to swing at, or to get there.
+    if (t - now < SWING_TIME || runTime(dist(stand), speed) + SPARE > t - now) continue;
     // Clear of the ball until just after contact, in case of a miss.
     if (inTheWay(path, i + MISSED, pos, stand, speed)) continue;
     const c = { t, i, stand, bounced: judging.drop !== null };
