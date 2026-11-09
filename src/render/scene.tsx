@@ -14,10 +14,10 @@ import {
 } from "../game/assist.ts";
 import type { Motion } from "../player/movement.ts";
 import { secondGalleryLineZ } from "../player/serve.ts";
-import { createWorld, type SimState } from "../sim/world.ts";
+import type { SimState } from "../sim/world.ts";
 import { ear } from "../audio/engine.ts";
+import { world } from "./world.ts";
 
-const world = createWorld(court);
 const hw = court.floor.width / 2;
 const hl = court.floor.length / 2;
 
