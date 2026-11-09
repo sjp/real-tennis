@@ -20,7 +20,11 @@ export interface ExplainStore {
 function load(): Explainer {
   try {
     const seen: unknown = JSON.parse(localStorage.getItem(SEEN) ?? "[]");
-    const ids = Array.isArray(seen) ? seen.filter((id): id is TeachingId => id in TEACHING) : [];
+    const ids = Array.isArray(seen)
+      ? seen.filter(
+          (id: unknown): id is TeachingId => typeof id === "string" && Object.hasOwn(TEACHING, id),
+        )
+      : [];
     return explainer(ids, localStorage.getItem(ON) !== "off");
   } catch {
     return explainer();
