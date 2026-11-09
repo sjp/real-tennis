@@ -19,6 +19,7 @@ import {
   type World,
 } from "../sim/world.ts";
 import { Court } from "./Court.tsx";
+import { inset } from "./view.ts";
 
 const hw = court.floor.width / 2;
 
@@ -184,8 +185,8 @@ function EventLog({ events }: { events: readonly SimEvent[] }) {
     <ol
       style={{
         position: "absolute",
-        left: 12,
-        bottom: 12,
+        left: inset("left", 12),
+        bottom: inset("bottom", 12),
         margin: 0,
         padding: "8px 8px 8px 28px",
         maxHeight: "40vh",

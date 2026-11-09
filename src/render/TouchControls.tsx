@@ -3,7 +3,7 @@ import { SHOT_TYPES, type ShotType } from "../input/input.ts";
 import { STICK_RADIUS, type Stick, type Touch } from "../input/touch.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
 import { useMedia } from "./media.ts";
-import { HIGHLIGHT } from "./view.ts";
+import { HIGHLIGHT, inset } from "./view.ts";
 
 const SHOT_NAMES: Record<ShotType, string> = {
   drive: "Drive",
@@ -163,8 +163,8 @@ export function TouchControls({
           <div
             style={{
               position: "absolute",
-              left: 24,
-              bottom: 24,
+              left: inset("left", 24),
+              bottom: inset("bottom", 24),
               color: "rgba(255, 255, 255, 0.5)",
               font: "12px ui-monospace, monospace",
             }}
@@ -175,7 +175,14 @@ export function TouchControls({
       </div>
       <div style={{ pointerEvents: "auto" }}>
         <Press
-          style={{ ...round, right: 24, bottom: 24, width: 96, height: 96, fontSize: 16 }}
+          style={{
+            ...round,
+            right: inset("right", 24),
+            bottom: inset("bottom", 24),
+            width: 96,
+            height: 96,
+            fontSize: 16,
+          }}
           onPress={() => {
             touch.swing();
           }}
@@ -185,8 +192,8 @@ export function TouchControls({
         <div
           style={{
             position: "absolute",
-            right: 24,
-            bottom: 136,
+            right: inset("right", 24),
+            bottom: `calc(${inset("bottom", 24)} + 112px)`,
             display: "flex",
             gap: 6,
             flexWrap: "wrap",
@@ -224,8 +231,8 @@ export function TouchControls({
         <div
           style={{
             position: "absolute",
-            right: 12,
-            top: 12,
+            right: inset("right", 12),
+            top: inset("top", 12),
             display: "flex",
             gap: 6,
             flexWrap: "wrap",

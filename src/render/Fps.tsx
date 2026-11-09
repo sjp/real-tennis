@@ -1,6 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
-import { panel } from "./view.ts";
+import { inset, panel } from "./view.ts";
 
 /** What the renderer did last frame, for the meter. */
 const stats = { calls: 0, triangles: 0, frames: 0, dpr: 1, worst: 0, slow: 0 };
@@ -45,7 +45,15 @@ export function FpsMeter() {
     };
   }, []);
   return (
-    <div style={{ ...panel, left: "50%", bottom: 8, transform: "translateX(-50%)", fontSize: 11 }}>
+    <div
+      style={{
+        ...panel,
+        left: "50%",
+        bottom: inset("bottom", 8),
+        transform: "translateX(-50%)",
+        fontSize: 11,
+      }}
+    >
       {text}
     </div>
   );

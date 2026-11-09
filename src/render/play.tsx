@@ -35,7 +35,7 @@ import type { PlayUi } from "./playUi.ts";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { TouchControls, type Extra } from "./TouchControls.tsx";
-import { cameraStart, DPR, FPS, panel, srOnly } from "./view.ts";
+import { cameraStart, DPR, FPS, inset, panel, srOnly } from "./view.ts";
 import { world } from "./world.ts";
 
 export function BallMesh({ ball }: { ball: RefObject<Mesh | null> }) {
@@ -235,7 +235,15 @@ export const HudChases = memo(function HudChases({ hud }: { hud: HudStore<Chases
 /** The keys, bottom left, on a keyboard screen. */
 export function HelpPanel({ lines, children }: { lines: readonly string[]; children?: ReactNode }) {
   return (
-    <div style={{ ...panel, left: 12, bottom: 12, fontSize: 12, color: "#b8b8b8" }}>
+    <div
+      style={{
+        ...panel,
+        left: inset("left", 12),
+        bottom: inset("bottom", 12),
+        fontSize: 12,
+        color: "#b8b8b8",
+      }}
+    >
       {lines.map((h) => (
         <div key={h}>{h}</div>
       ))}
