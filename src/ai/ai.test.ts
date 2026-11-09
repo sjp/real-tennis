@@ -161,6 +161,51 @@ describe("the AI", () => {
   });
 });
 
+describe("choosing a stroke", () => {
+  const start = startPlay(world, config, () => 0.2, labels).state;
+  /** Player a's drive landing deep at the hazard end, with b waiting there. */
+  const struck: PlayState = {
+    ...start,
+    athletes: start.athletes.map((a) =>
+      a.id === "b"
+        ? { ...a, motion: { position: { x: 1.5, z: 8 }, velocity: { x: 0, z: 0 } } }
+        : { ...a, serve: null },
+    ) as never,
+    sim: initialState(
+      {
+        position: vec(0, 1.2, -6),
+        velocity: aimAt(world.ball, vec(0, 1.2, -6), vec(1, world.ball.radius, 5), ZERO, {
+          elevation: 0.15,
+        }),
+        spin: ZERO,
+      },
+      start.sim.time,
+    ),
+    rally: startRally(start.rally.setup, "a"),
+  };
+  // Perfect in its stroke, so only the choice is tested.
+  const exact = (ambition: number) => ({
+    ...AI_PRESETS.hard,
+    ambition,
+    timing: 0,
+    noise: 0,
+    aim: 0,
+    judgement: 0,
+  });
+
+  it("goes for the Dedans from the hazard end when a stroke would go in", () => {
+    const { hits, state } = play(struck, "b", exact(1), 1);
+    expect(hits).toEqual(["b"]);
+    expect(state.rally.outcome).toMatchObject({ kind: "point", winner: "b", reason: "dedans" });
+  });
+
+  it("plays safe without the ambition", () => {
+    const { hits, state } = play(struck, "b", exact(0), 1);
+    expect(hits).toEqual(["b"]);
+    expect(state.rally.outcome).not.toMatchObject({ reason: "dedans" });
+  });
+});
+
 describe("planning a stroke", () => {
   const start = startPlay(world, config, () => 0.2, labels).state;
 

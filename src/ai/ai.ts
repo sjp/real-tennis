@@ -2,10 +2,12 @@ import type { ChaseMark, FloorPoint, Side } from "../court/types.ts";
 import { HIGH, LOW, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
 import { clampMove, IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
 import { clampToEnd, forwardZ, move, standardPlayer } from "../player/movement.ts";
-import { SWING_TIME } from "../player/timing.ts";
+import { planShot } from "../player/shot.ts";
+import { grade, SWING_TIME } from "../player/timing.ts";
 import { rally, type PlayerId, type RallyOutcome, type RallyState } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { closestOnSegment } from "../sim/contact.ts";
+import { hit } from "../sim/racket.ts";
 import { length, sub, type Vec3 } from "../sim/vec.ts";
 import {
   STEP,
@@ -36,6 +38,11 @@ interface Plan {
   readonly shot: ShotType;
   /** The move input held at contact. */
   readonly aim: InputState["move"];
+  /**
+   * When the ball it plays was struck, if it has chosen its stroke: it
+   * keeps that choice while it replans for the same ball.
+   */
+  readonly chosenFor: number | null;
 }
 
 export interface AiMemory {
@@ -266,16 +273,89 @@ function standFor(at: Vec3, end: Side, backhand: boolean): FloorPoint {
   return { x: at.x - side, z: at.z - forwardZ(end) * 0.3 };
 }
 
-function chooseShot(
+/** The stroke it plays: a shot type and the move input held at contact. */
+interface Stroke {
+  readonly shot: ShotType;
+  readonly aim: InputState["move"];
+}
+
+/** How long a forecast follows the struck ball. */
+const FORECAST = 3;
+const FORECAST_STEPS = Math.round(FORECAST / STEP);
+/** A perfectly timed stroke, as it pictures its own. */
+const CLEAN = grade(0, false);
+
+/**
+ * What the rules engine says happens if `me` strikes the ball in `at` cleanly
+ * with `stroke`, and nobody touches it after: the rest as it stands at contact
+ * is `rest`. Null if it isn't decided within FORECAST.
+ */
+function forecast(
+  world: World,
   me: Athlete,
-  r: RallyState,
+  at: SimState,
+  rest: RallyState,
+  stroke: Stroke,
+): RallyOutcome | null {
+  const racket = planShot(world, me.id, stroke.shot, at.ball, me.end, stroke.aim, CLEAN).racket;
+  const struck = hit(world.ball, at, racket);
+  let r = rest;
+  for (const e of struck.events) r = rally(r, e).state;
+  let s = struck.state;
+  for (let i = 0; i < FORECAST_STEPS && !r.outcome && s.captured === null && !s.asleep; i++) {
+    const next = step(world, s);
+    s = next.state;
+    for (const e of next.events) r = rally(r, e).state;
+  }
+  return r.outcome;
+}
+
+/** The stroke of `strokes` whose forecast is worth most to it, with that worth. */
+function bestStroke(
+  world: World,
+  me: Athlete,
+  at: SimState,
+  rest: RallyState,
+  strokes: readonly Stroke[],
+): { readonly stroke: Stroke; readonly value: number } {
+  let best = { stroke: strokes[0]!, value: -1 };
+  for (const stroke of strokes) {
+    const value = outcomeValue(world, forecast(world, me, at, rest, stroke), me.id, me.end);
+    if (value > best.value) best = { stroke, value };
+    if (value === 1) break;
+  }
+  return best;
+}
+
+/** Every combination of a shot with aims across (`xs`) and along (`ys`) the court. */
+function strokesOf(shot: ShotType, xs: readonly number[], ys: readonly number[]): Stroke[] {
+  return xs.flatMap((x) => ys.map((y) => ({ shot, aim: { x, y } })));
+}
+
+/**
+ * Strokes that can win outright through an opening on the far side, for each
+ * end: lobs into the Dedans from the hazard end, and into the Grille or the
+ * Winning Gallery from the service end. Searched offline over contacts across
+ * each end; which, if any, works from here is up to `forecast`. ⚠ verify
+ */
+const OPENINGS: Readonly<Record<Side, readonly Stroke[]>> = {
+  hazard: strokesOf("lob", [0, 0.5, -0.5], [0.2, 0.05]),
+  service: [...strokesOf("lob", [1], [0.3, 0.1]), ...strokesOf("lob", [-1], [-0.8])],
+};
+
+function chooseShot(
+  world: World,
+  me: Athlete,
+  at: SimState,
+  rest: RallyState,
   preset: AiPreset,
   random: () => number,
-): { shot: ShotType; aim: InputState["move"] } {
-  const attacking = r.setup.playingFor !== null && r.setup.playingFor.mark.side !== me.end;
-  // Ambitious shots: a drive for an opening, or a lob deep into the corner.
+): Stroke {
+  const attacking = rest.setup.playingFor !== null && rest.setup.playingFor.mark.side !== me.end;
+  // Going for an opening, when one of the strokes for it would go in from here.
   if (!attacking && random() < preset.ambition) {
-    return { shot: "drive", aim: { x: (random() - 0.5) * 1.6, y: 1 } };
+    const best = bestStroke(world, me, at, rest, OPENINGS[me.end]);
+    if (best.value === 1) return best.stroke;
   }
   // A boast only reaches the far side from near the net.
   const near = Math.abs(me.motion.position.z) < BOAST_RANGE;
@@ -335,6 +415,7 @@ function makePlan(
   preset: AiPreset,
   random: () => number,
   capsule: PlayerCapsule,
+  previous: Plan | null,
 ): Plan {
   const { me, sim } = view;
   const now = sim.time;
@@ -361,7 +442,8 @@ function makePlan(
 
   const pos = me.motion.position;
   const dist = (s: FloorPoint) => Math.hypot(s.x - pos.x, s.z - pos.z);
-  type Candidate = { t: number; i: number; stand: FloorPoint };
+  /** The rest as it stands at contact, before the stroke. */
+  type Candidate = { t: number; i: number; stand: FloorPoint; rest: RallyState };
   let first: Candidate | null = null;
   let afterBounce: Candidate | null = null;
   // Best of all: after the bounce, with time to get set.
@@ -401,7 +483,7 @@ function makePlan(
     if (at(i) > ARRIVE) continue;
     // Clear of the ball until just after contact, in case of a miss.
     if (inTheWay(path, i + MISSED, run)) continue;
-    const c = { t, i, stand };
+    const c = { t, i, stand, rest: judging };
     first ??= c;
     if (judging.drop === null) continue;
     afterBounce ??= c;
@@ -414,7 +496,7 @@ function makePlan(
   if (target === null || (judged && leave > preset.keep)) {
     // Keep out of its way: the ball touching a player loses the rest.
     const stand = clearSpot(world, me, path, states, capsule, preset.speed, target ? pos : base);
-    return { stand, swingAt: null, shot: me.shot, aim: { x: 0, y: 0 } };
+    return { stand, swingAt: null, shot: me.shot, aim: { x: 0, y: 0 }, chosenFor: null };
   }
 
   // Misjudging the flight: more so the further ahead it is.
@@ -429,12 +511,30 @@ function makePlan(
   // A hurried stroke is harder to time.
   const there = run.findIndex((q) => Math.hypot(q.x - stand.x, q.z - stand.z) <= ARRIVE);
   const hurry = ((there < 0 ? run.length : there) * SAMPLE * STEP) / ahead;
-  const { shot, aim } = chooseShot(me, view.rally, preset, random);
+  const struck = sim.lastHitTime;
+  const chosen =
+    previous?.chosenFor === struck
+      ? previous
+      : aimed(
+          chooseShot(world, me, states[target.i]!, target.rest, preset, random),
+          preset,
+          random,
+        );
   return {
     stand,
     swingAt: target.t - SWING_TIME + gaussian(random) * preset.timing * (1 + 2 * hurry),
-    shot,
-    aim: clampMove(aim.x + gaussian(random) * preset.aim, aim.y + gaussian(random) * preset.aim),
+    shot: chosen.shot,
+    aim: chosen.aim,
+    chosenFor: struck,
+  };
+}
+
+/** The stroke as it comes off its hand: the aim spread by its precision. */
+function aimed(stroke: Stroke, preset: AiPreset, random: () => number): Stroke {
+  const { x, y } = stroke.aim;
+  return {
+    shot: stroke.shot,
+    aim: clampMove(x + gaussian(random) * preset.aim, y + gaussian(random) * preset.aim),
   };
 }
 
@@ -468,6 +568,7 @@ export function aiInput(
         swingAt: contact - SWING_TIME + gaussian(random) * preset.timing * 0.5,
         shot: me.shot,
         aim: clampMove(gaussian(random) * preset.aim, gaussian(random) * preset.aim),
+        chosenFor: null,
       };
     }
     return { input: strike(me, plan, now), memory: { ...memory, plan } };
@@ -491,7 +592,7 @@ export function aiInput(
   // Once swinging, it sees the stroke through.
   const swinging = me.swing !== null && !me.swing.contact;
   if (!swinging && now >= m.lookAt && m.planned !== m.seen) {
-    const plan = makePlan(world, view, preset, random, capsule);
+    const plan = makePlan(world, view, preset, random, capsule, m.plan);
     const select = plan.swingAt !== null ? SHOT_TYPES.indexOf(plan.shot) + 1 : null;
     m = { ...m, plan, planned: m.seen };
     return { input: { ...runFor(me, plan.stand, preset.speed), select }, memory: m };
