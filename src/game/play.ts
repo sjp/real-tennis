@@ -21,7 +21,15 @@ import { teach, type TeachingEvent } from "../rules/teaching.ts";
 import type { SimEvent } from "../sim/events.ts";
 import { vec } from "../sim/vec.ts";
 import { step, type SimState, type World } from "../sim/world.ts";
-import { act, afterStep, held, playerCapsule, type Athlete, type Notice } from "./player.ts";
+import {
+  act,
+  afterStep,
+  held,
+  inHand,
+  playerCapsule,
+  type Athlete,
+  type Notice,
+} from "./player.ts";
 
 /** How long the Marker's call stands before the next rest is set up. */
 export const CALL_PAUSE = 2;
@@ -68,8 +76,11 @@ function setUpRest(world: World, s: PlayState): PlayState {
       },
     };
   }) as unknown as readonly [Athlete, Athlete];
+  // The last rest's ball may still be rolling; it's out of play now.
+  const ready = athletes.find((a) => a.id === server)!;
   return {
     ...s,
+    sim: inHand(world, ready, s.sim.time),
     athletes,
     rally: startRally(rallySetup(s.match)),
     phase: "play",

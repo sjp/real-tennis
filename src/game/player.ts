@@ -86,6 +86,12 @@ export function held(at: Vec3, time: number): SimState {
   };
 }
 
+/** The ball in a ready server's hand, before the toss. */
+export function inHand(world: World, a: Athlete, time: number): SimState {
+  const style = SERVE_STYLES[a.serveStyle]!;
+  return held(toss(style, a.motion.position, a.end, world.ball.gravity).position, time);
+}
+
 export function playerCapsule(a: Athlete): PlayerCapsule {
   const { x, z } = a.motion.position;
   return { id: a.id, a: vec(x, 0.3, z), b: vec(x, params.height - 0.3, z), radius: 0.25 };
@@ -287,11 +293,7 @@ export function act(
   }
   if (a.swing && sim.time >= a.swing.start + SWING_TIME + FOLLOW_THROUGH) a = { ...a, swing: null };
 
-  if (a.serve === "ready") {
-    const style = SERVE_STYLES[a.serveStyle]!;
-    const hand = toss(style, a.motion.position, a.end, world.ball.gravity).position;
-    sim = held(hand, sim.time);
-  }
+  if (a.serve === "ready") sim = inHand(world, a, sim.time);
   return { athlete: a, sim, events, notices, judged };
 }
 

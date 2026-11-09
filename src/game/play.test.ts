@@ -4,7 +4,8 @@ import { standardCourt as court } from "../court/standard.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { serveSpot } from "../player/serve.ts";
 import type { MatchConfig } from "../rules/match.ts";
-import { createWorld, STEP } from "../sim/world.ts";
+import { vec, ZERO } from "../sim/vec.ts";
+import { createWorld, initialState, STEP } from "../sim/world.ts";
 import { athleteOf, CALL_PAUSE, playStep, receiveSpot, startPlay, type PlayState } from "./play.ts";
 
 const world = createWorld(court);
@@ -80,5 +81,41 @@ describe("a match", () => {
     const { state, calls } = run(point, CALL_PAUSE + STEP);
     expect(calls).toEqual(["game", "set", "match"]);
     expect(state).toMatchObject({ phase: "over", match: { winner: "a" } });
+  });
+
+  it("takes the last rest's ball out of play when the next is set up (230)", () => {
+    // "b" serves, so "a", the receiver, acts first in each step.
+    const { state: start } = startPlay(world, config, () => 0.9, labels);
+    const spot = receiveSpot(world);
+    // The last rest's ball, still rolling near where the receiver waits.
+    const rolling = initialState(
+      {
+        position: vec(spot.x + 0.3, world.ball.radius, spot.z),
+        velocity: vec(-0.5, 0, 0),
+        spin: ZERO,
+      },
+      start.sim.time,
+    );
+    const called: PlayState = {
+      ...start,
+      sim: rolling,
+      athletes: start.athletes.map((a) => ({
+        ...a,
+        serve: null,
+      })) as unknown as PlayState["athletes"],
+      phase: "called",
+      // The next step sets up the new rest.
+      since: start.sim.time - CALL_PAUSE,
+      rally: { ...start.rally, outcome: { kind: "point", winner: "a", reason: "dedans" } },
+    };
+    let s = playStep(world, called, idle).state;
+    expect(s.phase).toBe("play");
+    expect(s.sim.live).toBe(false);
+    for (let i = 0; i < 30; i++) {
+      const r = playStep(world, s, idle, ["a"]);
+      expect(r.events.filter((e) => e.type === "racketHit")).toEqual([]);
+      s = r.state;
+    }
+    expect(s.rally.striker).toBeNull();
   });
 });
