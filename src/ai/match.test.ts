@@ -55,5 +55,13 @@ describe("AI against AI", () => {
       );
       expect(new Set(lost.map(reason)).size).toBeGreaterThanOrEqual(4);
     });
+
+    it("rarely lets the ball touch a player", () => {
+      // 237: the ball hit a player in about 10% of rests when the AI ran
+      // through its path.
+      const rests = matches.flatMap((m) => m.rests);
+      const touched = rests.filter((r) => reason(r) === "touchedByBall");
+      expect(touched.length / rests.length).toBeLessThan(0.05);
+    });
   });
 });

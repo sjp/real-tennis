@@ -1,7 +1,7 @@
 import type { ChaseMark, FloorPoint, Side } from "../court/types.ts";
 import { HIGH, LOW, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
 import { clampMove, IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
-import { forwardZ, standardPlayer } from "../player/movement.ts";
+import { clampToEnd, forwardZ, move, standardPlayer } from "../player/movement.ts";
 import { SWING_TIME } from "../player/timing.ts";
 import { rally, type PlayerId, type RallyOutcome, type RallyState } from "../rules/rally.ts";
 import type { SimEvent } from "../sim/events.ts";
@@ -150,43 +150,67 @@ const MISSED = Math.round(0.3 / STEP);
 /** Boasts are played from this close to the net. ⚠ verify */
 const BOAST_RANGE = 7;
 
-/** Just inside and outside BODY, squared: nearer or further is clear without `Math.hypot`. */
-const BODY_IN = (BODY * (1 - 1e-6)) ** 2;
-const BODY_OUT = (BODY * (1 + 1e-6)) ** 2;
 /**
  * Steps predicted past the rest being decided: the last candidate can come a
  * sample after it, and is kept clear of the body for MISSED steps beyond.
  */
 const TAIL = 2 * SAMPLE + MISSED;
+/** How close to its spot it must be at contact to call a ball reachable. */
+const ARRIVE = 0.5;
+/** How close it must be SPARE before contact to be settled for the stroke. */
+const SETTLED = 0.2;
+/** How far its spot can be pushed in by the walls and still give a fair swing. */
+const CRAMPED = 0.4;
+
+/** The input `strike` gives to run to `stand`: a sprint while it's far. */
+function runFor(me: Athlete, stand: FloorPoint, speed: number): InputState {
+  const run = runTo(me, stand, speed);
+  const far = Math.hypot(stand.x - me.motion.position.x, stand.z - me.motion.position.z);
+  return { ...run, sprint: far > 1.5 };
+}
 
 /**
- * Whether the ball on its way would hit the body as it runs from `from` to
- * `stand`. `path` starts now, a step apart; only its first `end` points count.
+ * Where the body will be every SAMPLE steps from now, `samples` times, if it
+ * runs to `stand` as `strike` does: speeding up and slowing down, and stopped
+ * by the walls and the net.
  */
-function inTheWay(
-  path: readonly Vec3[],
-  end: number,
-  from: FloorPoint,
+function runPath(
+  world: World,
+  me: Athlete,
   stand: FloorPoint,
   speed: number,
-): boolean {
-  const d = Math.hypot(stand.x - from.x, stand.z - from.z);
-  // The body stays in this box, so points outside it are clear.
-  const pad = BODY * 1.001;
-  const x0 = Math.min(from.x, stand.x) - pad;
-  const x1 = Math.max(from.x, stand.x) + pad;
-  const z0 = Math.min(from.z, stand.z) - pad;
-  const z1 = Math.max(from.z, stand.z) + pad;
+  samples: number,
+): FloorPoint[] {
+  let m = me.motion;
+  const out = [m.position];
+  for (let k = 0; k < samples; k++) {
+    m = move(
+      world.court,
+      params,
+      m,
+      runFor({ ...me, motion: m }, stand, speed),
+      me.end,
+      SAMPLE * STEP,
+    );
+    out.push(m.position);
+  }
+  return out;
+}
+
+/**
+ * Whether the ball on its way would hit the body as it runs along `run`
+ * (from `runPath`). `path` starts now, a step apart; only its first `end`
+ * points count.
+ */
+function inTheWay(path: readonly Vec3[], end: number, run: readonly FloorPoint[]): boolean {
   const n = Math.min(end, path.length);
   for (let i = 0; i < n; i++) {
     const p = path[i]!;
-    if (p.y > params.height || p.x < x0 || p.x > x1 || p.z < z0 || p.z > z1) continue;
-    const k = d > 0 ? Math.min(d, speed * i * STEP) / d : 0;
-    const dx = p.x - (from.x + (stand.x - from.x) * k);
-    const dz = p.z - (from.z + (stand.z - from.z) * k);
-    const q = dx * dx + dz * dz;
-    if (q < BODY_IN) return true;
-    if (q <= BODY_OUT && Math.hypot(dx, dz) < BODY) return true;
+    if (p.y > params.height) continue;
+    const body = run[Math.min(run.length - 1, Math.round(i / SAMPLE))]!;
+    const dx = p.x - body.x;
+    const dz = p.z - body.z;
+    if (dx * dx + dz * dz < BODY * BODY) return true;
   }
   return false;
 }
@@ -242,12 +266,6 @@ function standFor(at: Vec3, end: Side, backhand: boolean): FloorPoint {
   return { x: at.x - side, z: at.z - forwardZ(end) * 0.3 };
 }
 
-/** Time to run `d` metres from standing, at `speed`. */
-function runTime(d: number, speed: number): number {
-  const ramp = speed / params.acceleration;
-  return d < (speed * ramp) / 2 ? Math.sqrt((2 * d) / params.acceleration) : d / speed + ramp / 2;
-}
-
 function chooseShot(
   me: Athlete,
   r: RallyState,
@@ -268,6 +286,41 @@ function chooseShot(
     shot: "cut",
     aim: { x: (random() - 0.5) * 1.2, y: attacking ? 1 : 0.4 + random() * 0.6 },
   };
+}
+
+/**
+ * Where to wait while the ball goes by: `wanted` if the ball stays clear of
+ * it, or else the nearest spot a few steps away that it can get to without
+ * the ball touching it on the way.
+ */
+function clearSpot(
+  world: World,
+  me: Athlete,
+  path: readonly Vec3[],
+  states: readonly SimState[],
+  capsule: PlayerCapsule,
+  speed: number,
+  wanted: FloorPoint,
+): FloorPoint {
+  const pos = me.motion.position;
+  const samples = Math.ceil(path.length / SAMPLE);
+  const still = wanted.x === pos.x && wanted.z === pos.z;
+  if (
+    still
+      ? !hitsBody(world, states, capsule, me.id)
+      : !inTheWay(path, path.length, runPath(world, me, wanted, speed, samples))
+  )
+    return wanted;
+  const spots = [1.5, 3].flatMap((d) => [
+    { x: pos.x + d, z: pos.z },
+    { x: pos.x - d, z: pos.z },
+    { x: pos.x, z: pos.z + d },
+    { x: pos.x, z: pos.z - d },
+  ]);
+  const clear = spots
+    .map((s) => clampToEnd(world.court, params, me.end, s))
+    .find((s) => !inTheWay(path, path.length, runPath(world, me, s, speed, samples)));
+  return clear ?? { x: pos.x + (pos.x > 0 ? -1.5 : 1.5), z: pos.z };
 }
 
 /**
@@ -304,17 +357,18 @@ function makePlan(
   }
   const path = states.map((s) => s.ball.position);
   const f = forwardZ(me.end);
-  const speed = preset.speed * params.sprintSpeed;
   const base = basePosition(world, me.end);
 
   const pos = me.motion.position;
   const dist = (s: FloorPoint) => Math.hypot(s.x - pos.x, s.z - pos.z);
-  type Candidate = { t: number; i: number; stand: FloorPoint; bounced: boolean };
+  type Candidate = { t: number; i: number; stand: FloorPoint };
   let first: Candidate | null = null;
   let afterBounce: Candidate | null = null;
+  // Best of all: after the bounce, with time to get set.
+  let settled: Candidate | null = null;
   let judging = view.rally;
   let next = 0;
-  for (let i = SAMPLE; i < path.length && !afterBounce; i += SAMPLE) {
+  for (let i = SAMPLE; i < path.length && !settled; i += SAMPLE) {
     const t = now + i * STEP;
     while (next < events.length && events[next]!.time <= t) {
       judging = rally(judging, events[next]!).state;
@@ -331,24 +385,35 @@ function makePlan(
       surface: "racket",
     }).state.outcome;
     if (!legal) continue;
+    // Too soon to swing at.
+    if (t - now < SWING_TIME) continue;
     const stands = [false, true].map((b) => standFor(p, me.end, b));
-    const stand = dist(stands[0]!) <= dist(stands[1]!) + 0.5 ? stands[0]! : stands[1]!;
-    // Too soon to swing at, or to get there.
-    if (t - now < SWING_TIME || runTime(dist(stand), speed) + SPARE > t - now) continue;
+    const ideal = dist(stands[0]!) <= dist(stands[1]!) + 0.5 ? stands[0]! : stands[1]!;
+    // Somewhere it can stand: not too cramped by a wall or the net.
+    const stand = clampToEnd(world.court, params, me.end, ideal);
+    if (Math.hypot(stand.x - ideal.x, stand.z - ideal.z) > CRAMPED) continue;
+    const run = runPath(world, me, stand, preset.speed, Math.ceil((i + MISSED) / SAMPLE));
+    // Too far to get there by contact.
+    const at = (k: number) => {
+      const q = run[Math.max(0, Math.min(run.length - 1, Math.floor(k / SAMPLE)))]!;
+      return Math.hypot(q.x - stand.x, q.z - stand.z);
+    };
+    if (at(i) > ARRIVE) continue;
     // Clear of the ball until just after contact, in case of a miss.
-    if (inTheWay(path, i + MISSED, pos, stand, speed)) continue;
-    const c = { t, i, stand, bounced: judging.drop !== null };
+    if (inTheWay(path, i + MISSED, run)) continue;
+    const c = { t, i, stand };
     first ??= c;
-    if (c.bounced) afterBounce = c;
+    if (judging.drop === null) continue;
+    afterBounce ??= c;
+    if (at(i - SPARE / STEP) <= SETTLED) settled = c;
   }
 
   const leave = outcomeValue(world, left.outcome, me.id, me.end);
-  const target = afterBounce ?? first;
+  const target = settled ?? afterBounce ?? first;
   const judged = random() < preset.judgement;
   if (target === null || (judged && leave > preset.keep)) {
     // Keep out of its way: the ball touching a player loses the rest.
-    const hit = hitsBody(world, states, capsule, me.id);
-    const stand = hit ? { x: pos.x + (pos.x > 0 ? -1.5 : 1.5), z: pos.z } : target ? pos : base;
+    const stand = clearSpot(world, me, path, states, capsule, preset.speed, target ? pos : base);
     return { stand, swingAt: null, shot: me.shot, aim: { x: 0, y: 0 } };
   }
 
@@ -358,9 +423,12 @@ function makePlan(
     x: target.stand.x + gaussian(random) * preset.noise * ahead,
     z: target.stand.z + gaussian(random) * preset.noise * ahead,
   };
-  const stand = inTheWay(path, target.i + MISSED, pos, guess, speed) ? target.stand : guess;
+  const samples = Math.ceil((target.i + MISSED) / SAMPLE);
+  const run = runPath(world, me, guess, preset.speed, samples);
+  const stand = inTheWay(path, target.i + MISSED, run) ? target.stand : guess;
   // A hurried stroke is harder to time.
-  const hurry = runTime(dist(stand), speed) / ahead;
+  const there = run.findIndex((q) => Math.hypot(q.x - stand.x, q.z - stand.z) <= ARRIVE);
+  const hurry = ((there < 0 ? run.length : there) * SAMPLE * STEP) / ahead;
   const { shot, aim } = chooseShot(me, view.rally, preset, random);
   return {
     stand,
@@ -426,7 +494,7 @@ export function aiInput(
     const plan = makePlan(world, view, preset, random, capsule);
     const select = plan.swingAt !== null ? SHOT_TYPES.indexOf(plan.shot) + 1 : null;
     m = { ...m, plan, planned: m.seen };
-    return { input: { ...runTo(me, plan.stand, preset.speed), select }, memory: m };
+    return { input: { ...runFor(me, plan.stand, preset.speed), select }, memory: m };
   }
   if (!m.plan) return { input: IDLE, memory: m };
   return { input: strike(me, m.plan, now, preset.speed), memory: m };
@@ -438,12 +506,10 @@ function strike(me: Athlete, plan: Plan, now: number, speed = 1): InputState {
     const contact = me.swing.start + SWING_TIME;
     // The aim is the move input at contact.
     if (now + 2 * STEP >= contact) return { ...IDLE, move: plan.aim };
-    return me.serve !== null ? IDLE : runTo(me, plan.stand, speed);
+    return me.serve !== null ? IDLE : runFor(me, plan.stand, speed);
   }
   if (plan.swingAt !== null && !me.swing && now >= plan.swingAt && now < plan.swingAt + 0.1)
     return { ...IDLE, swing: true };
   if (me.serve !== null) return IDLE;
-  const run = runTo(me, plan.stand, speed);
-  const far = Math.hypot(plan.stand.x - me.motion.position.x, plan.stand.z - me.motion.position.z);
-  return { ...run, sprint: far > 1.5 };
+  return runFor(me, plan.stand, speed);
 }

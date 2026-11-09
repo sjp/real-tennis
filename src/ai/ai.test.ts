@@ -148,7 +148,8 @@ describe("the AI", () => {
       sim: initialState({ position: from, velocity, spin: ZERO }, start.sim.time),
       rally: startRally(start.rally.setup, "a"),
     };
-    const sure = (judgement: number) => ({ ...AI_PRESETS.hard, judgement });
+    // Timed perfectly, so only the decision is tested, not its stroke.
+    const sure = (judgement: number) => ({ ...AI_PRESETS.hard, judgement, timing: 0 });
     // Without weighing it up, it plays the ball.
     expect(play(struck, "b", sure(0), 1).hits).toEqual(["b"]);
     const { hits, state } = play(struck, "b", sure(1), 1);
