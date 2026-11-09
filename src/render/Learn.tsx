@@ -336,11 +336,6 @@ function LessonGame({
   // Holds play during the intro; read by the loop and the camera.
   const [gate] = useState(createGate);
   const uiHeld = ui.held;
-  const [isPaused] = useState(
-    () => () => gate.held() || uiHeld() || explain.get().showing !== null,
-  );
-  const [blend] = useState(() => createBlend(store.get()));
-  const [views] = useState(() => sceneViews(store, explain, lesson, gate.held, blend));
   const [hud] = useState(() =>
     createHud<Hud>({
       progress: 0,
@@ -352,6 +347,12 @@ function LessonGame({
     }),
   );
   const done = useHud(hud, (h) => h.done);
+  // Frozen once the lesson is complete, behind its panel (204).
+  const [isPaused] = useState(
+    () => () => gate.held() || uiHeld() || explain.get().showing !== null || hud.get().done,
+  );
+  const [blend] = useState(() => createBlend(store.get()));
+  const [views] = useState(() => sceneViews(store, explain, lesson, gate.held, blend));
 
   useEffect(() => {
     if (done) onDone();
