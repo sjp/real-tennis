@@ -61,7 +61,19 @@ function derivative(p: BallParams, s: BallState): Derivative {
     const cl = liftCoefficient((p.radius * spinAcross) / speed);
     if (cl > 0) a = madd(a, normalize(axis), k * cl * speed * speed);
   }
-  return { velocity: v, acceleration: a, spinRate: scale(s.spin, Math.log(1 - p.spinDecay)) };
+  return { velocity: v, acceleration: a, spinRate: scale(s.spin, spinDecayRate(p.spinDecay)) };
+}
+
+/** Least fraction of spin kept per second, so the decay rate stays finite. */
+const MIN_SPIN_KEPT = 1e-6;
+
+/**
+ * The exponential decay rate for losing `decay` of the spin each second. A
+ * decay of 1 or more (or NaN) loses nearly all of it; a negative one none.
+ */
+export function spinDecayRate(decay: number): number {
+  const kept = 1 - decay;
+  return Math.log(kept > MIN_SPIN_KEPT ? Math.min(1, kept) : MIN_SPIN_KEPT);
 }
 
 function advance(s: BallState, d: Derivative, dt: number): BallState {

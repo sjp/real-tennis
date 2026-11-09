@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { flight, liftCoefficient, standardBall, type BallParams, type BallState } from "./ball.ts";
+import {
+  flight,
+  liftCoefficient,
+  spinDecayRate,
+  standardBall,
+  type BallParams,
+  type BallState,
+} from "./ball.ts";
 import { length, vec, ZERO } from "./vec.ts";
 
 const dt = 1 / 240;
@@ -53,5 +60,22 @@ describe("liftCoefficient", () => {
     expect(liftCoefficient(0)).toBe(0);
     expect(liftCoefficient(1)).toBeCloseTo(1 / 3);
     expect(liftCoefficient(1000)).toBeCloseTo(0.5, 2);
+  });
+});
+
+describe("spinDecayRate", () => {
+  it("loses the given fraction of spin each second", () => {
+    expect(Math.exp(spinDecayRate(0.02))).toBeCloseTo(0.98);
+    expect(spinDecayRate(0)).toBe(0);
+  });
+
+  it("stays finite for a decay of 1 or more, or NaN (195)", () => {
+    for (const decay of [1, 1.5, Number.NaN]) {
+      expect(Number.isFinite(spinDecayRate(decay))).toBe(true);
+      const spun = { position: vec(0, 1, 0), velocity: vec(0, 0, 10), spin: vec(100, 0, 0) };
+      const out = flight({ ...standardBall, spinDecay: decay }, spun, 1 / 240);
+      expect(Number.isFinite(out.spin.x) && Number.isFinite(out.velocity.y)).toBe(true);
+      expect(Math.abs(out.spin.x)).toBeLessThan(100);
+    }
   });
 });

@@ -29,6 +29,11 @@ describe("racketImpact", () => {
     expect(mishit).toBeLessThan(0.8 * sweet);
   });
 
+  it("treats a NaN timing as a mishit (195)", () => {
+    const nan = racketImpact(ball, still, { ...flat, timing: Number.NaN });
+    expect(nan).toEqual(racketImpact(ball, still, { ...flat, timing: 0 }));
+  });
+
   it("does nothing if the racket isn't closing on the ball", () => {
     expect(racketImpact(ball, still, { ...flat, velocity: vec(0, 0, -5) })).toEqual(still);
   });

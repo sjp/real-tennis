@@ -36,7 +36,8 @@ export function racketImpact(
   racket: Racket,
   params: RacketParams = standardRacket,
 ): BallState {
-  const q = Math.min(1, Math.max(0, racket.timing));
+  // A NaN timing is a mishit rather than a NaN ball (195).
+  const q = Number.isNaN(racket.timing) ? 0 : Math.min(1, Math.max(0, racket.timing));
   return collide(
     p,
     ball,
