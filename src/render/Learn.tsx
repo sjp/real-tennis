@@ -40,6 +40,7 @@ import {
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
+import { useAnnouncer, type Announcer } from "./announce.ts";
 import {
   chasesOf as matchChases,
   choiceOf,
@@ -93,6 +94,7 @@ const Loop = memo(function Loop({
   isPaused,
   hud,
   blend,
+  announcer,
 }: {
   store: Store;
   pad: Touch;
@@ -101,6 +103,7 @@ const Loop = memo(function Loop({
   hud: HudStore<Hud>;
   /** Where the views draw from: the state before the latest step, and how far past it. */
   blend: Blend<LessonState>;
+  announcer: Announcer;
 }) {
   const ball = useStepLoop({
     pad,
@@ -117,6 +120,13 @@ const Loop = memo(function Loop({
       store.set(r.state);
       explainCalls(explain, r.calls, quiet(r.state));
       const notices = r.notices.map(describeNotice).filter((n) => n.last);
+      const { goal, count } = r.state.lesson;
+      announcer.say(
+        ...r.calls.map((c) => c.message),
+        r.scored
+          ? `${goal}: ${String(Math.min(r.state.progress, count))} of ${String(count)}`
+          : null,
+      );
       if (
         r.scored ||
         r.calls.length > 0 ||
@@ -274,6 +284,7 @@ function LessonGame({
   );
   const [blend] = useState(() => createBlend(store.get()));
   const [views] = useState(() => sceneViews(store, explain, lesson, gate.held, blend));
+  const announcer = useAnnouncer();
 
   useEffect(() => {
     if (done) onDone();
@@ -324,6 +335,7 @@ function LessonGame({
           isPaused={isPaused}
           hud={hud}
           blend={blend}
+          announcer={announcer}
         />
         <HudChases hud={hud} />
       </PlayScene>

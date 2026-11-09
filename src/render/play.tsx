@@ -21,7 +21,9 @@ import type { Touch } from "../input/touch.ts";
 import type { Motion } from "../player/movement.ts";
 import type { TeachingId } from "../rules/teaching.ts";
 import type { SimState } from "../sim/world.ts";
+import { EXPLANATIONS } from "../teach/content.ts";
 import { dismiss, toggle } from "../teach/explain.ts";
+import { AnnouncerContext, createAnnouncer, useAnnouncer, type Announcer } from "./announce.ts";
 import { Court } from "./Court.tsx";
 import type { ExplainStore } from "./explainStore.ts";
 import { FpsProbe } from "./Fps.tsx";
@@ -33,7 +35,7 @@ import type { PlayUi } from "./playUi.ts";
 import { AssistRings, Ears, FollowCamera, ServeLine } from "./scene.tsx";
 import { ExplainPanel, Highlight } from "./teach.tsx";
 import { TouchControls, type Extra } from "./TouchControls.tsx";
-import { cameraStart, DPR, FPS, panel } from "./view.ts";
+import { cameraStart, DPR, FPS, panel, srOnly } from "./view.ts";
 import { world } from "./world.ts";
 
 export function BallMesh({ ball }: { ball: RefObject<Mesh | null> }) {
@@ -111,6 +113,18 @@ type Slot = ReturnType<typeof createSlot>;
 
 const SlotContext = createContext<Slot | null>(null);
 
+/** The screen's one polite live region, not shown. */
+function LiveRegion({ announcer }: { announcer: Announcer }) {
+  const said = useSyncExternalStore(announcer.subscribe, announcer.get);
+  return (
+    <div aria-live="polite" style={srOnly}>
+      {said.map((s) => (
+        <div key={s.n}>{s.text}</div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * A playing screen's one canvas (212), kept for as long as the screen, so a
  * new lesson or match doesn't make a new WebGL context, recompile every
@@ -120,11 +134,18 @@ const SlotContext = createContext<Slot | null>(null);
  */
 export function PlayStage({ children }: { children: ReactNode }) {
   const [slot] = useState(createSlot);
+  const [announcer] = useState(createAnnouncer);
   const scene = useSyncExternalStore(slot.subscribe, slot.get);
   const stopped = scene?.stopped ?? true;
   return (
     <SlotContext value={slot}>
-      <Canvas dpr={DPR} frameloop={stopped ? "never" : "always"} camera={{ fov: 55 }}>
+      <Canvas
+        dpr={DPR}
+        frameloop={stopped ? "never" : "always"}
+        camera={{ fov: 55 }}
+        role="img"
+        aria-label="The court, seen from behind the player"
+      >
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[4, 12, -6]} intensity={1.8} />
@@ -135,7 +156,8 @@ export function PlayStage({ children }: { children: ReactNode }) {
         {scene && <Fragment key={scene.id}>{scene.node}</Fragment>}
         <StillFrame stopped={stopped} />
       </Canvas>
-      {children}
+      <LiveRegion announcer={announcer} />
+      <AnnouncerContext value={announcer}>{children}</AnnouncerContext>
     </SlotContext>
   );
 }
@@ -230,6 +252,14 @@ export function Explanation({
   explain: ExplainStore;
   showing: TeachingId | null;
 }) {
+  const announcer = useAnnouncer();
+  // Once per explanation, though Strict Mode runs the effect twice.
+  const said = useRef<TeachingId | null>(null);
+  useEffect(() => {
+    if (showing && showing !== said.current)
+      announcer.say("The Marker explains", EXPLANATIONS[showing].title);
+    said.current = showing;
+  }, [announcer, showing]);
   if (!showing) return null;
   return (
     <ExplainPanel

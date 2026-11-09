@@ -38,6 +38,7 @@ import {
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
+import { useAnnouncer, type Announcer } from "./announce.ts";
 import { choiceOf as choice, createStore, type Store } from "./playState.ts";
 import { useStepLoop } from "./useStepLoop.ts";
 import { world } from "./world.ts";
@@ -58,6 +59,7 @@ const Loop = memo(function Loop({
   isPaused,
   hud,
   blend,
+  announcer,
 }: {
   store: Store<PracticeState>;
   pad: Touch;
@@ -66,6 +68,7 @@ const Loop = memo(function Loop({
   isPaused: () => boolean;
   hud: HudStore<Hud>;
   blend: Blend<PracticeState>;
+  announcer: Announcer;
 }) {
   const ball = useStepLoop({
     pad,
@@ -82,10 +85,12 @@ const Loop = memo(function Loop({
       for (const n of r.notices) hud.set(describeNotice(n));
       const rally = r.state.rally;
       explainCalls(explain, r.calls, rally?.outcome !== null || rally.striker === null);
-      if (r.calls.length > 0)
+      if (r.calls.length > 0) {
+        announcer.say(...r.calls.map((c) => c.message));
         hud.set((h) => ({
           calls: [...h.calls, ...r.calls.map((c) => `${c.message} (Law ${c.law})`)].slice(-3),
         }));
+      }
       for (const e of r.events) {
         const text = describeEvent(e);
         if (text) hud.set({ event: text });
@@ -188,6 +193,7 @@ function PracticeGame() {
   const [isPaused] = useState(() => () => held() || explain.get().showing !== null);
   const [blend] = useState(() => createBlend(store.get()));
   const [views] = useState(() => sceneViews(store, explain, blend));
+  const announcer = useAnnouncer();
   const feature = ex.showing && EXPLANATIONS[ex.showing].feature;
   const [hud] = useState(() =>
     createHud<Hud>({ choice: choice(store.get()), last: null, calls: [], event: null }),
@@ -233,6 +239,7 @@ function PracticeGame() {
           isPaused={isPaused}
           hud={hud}
           blend={blend}
+          announcer={announcer}
         />
       </PlayScene>
       {FPS && <FpsMeter />}

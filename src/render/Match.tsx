@@ -42,6 +42,7 @@ import {
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
+import { useAnnouncer, type Announcer } from "./announce.ts";
 import {
   chasesOf,
   choiceOf as choice,
@@ -119,6 +120,7 @@ const Loop = memo(function Loop({
   hud,
   blend,
   skip,
+  announcer,
 }: {
   game: Store;
   pad: Touch;
@@ -131,6 +133,7 @@ const Loop = memo(function Loop({
   blend: Blend<PlayState>;
   /** The result modal was dismissed: end the Marker's pause now. */
   skip: Skip;
+  announcer: Announcer;
 }) {
   const ball = useStepLoop({
     pad,
@@ -181,8 +184,21 @@ const Loop = memo(function Loop({
         const text = describeEvent(e);
         if (text) hud.set({ event: text });
       }
-      if (rest) hud.set({ result: restResult(r.state.match, rest.outcome, r.calls, LABELS) });
-      else if (r.state.phase !== "called" && hud.get().result) hud.set({ result: null });
+      if (rest) {
+        const result = restResult(r.state.match, rest.outcome, r.calls, LABELS);
+        hud.set({ result });
+        // The result modal's words, and the Marker's call of the score (213).
+        announcer.say(
+          // Not "Chase laid. Chase laid: Worse than Two".
+          result.why.startsWith(result.title) ? null : result.title,
+          result.why,
+          result.note,
+          callScore(result.match, LABELS),
+        );
+      } else {
+        if (r.calls.length > 0) announcer.say(...r.calls.map((c) => c.message));
+        if (r.state.phase !== "called" && hud.get().result) hud.set({ result: null });
+      }
       // Explanations wait for the result to close.
       const quiet = r.state.phase !== "play" || r.state.rally.striker === null;
       explainCalls(explain, r.calls, quiet && hud.get().result === null);
@@ -335,6 +351,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
     () => () => held() || explain.get().showing !== null || hud.get().result !== null,
   );
   const [skip] = useState(createSkip);
+  const announcer = useAnnouncer();
 
   const me = human(game);
   const { assist } = useSettings();
@@ -358,6 +375,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           hud={hud}
           blend={blend}
           skip={skip}
+          announcer={announcer}
         />
         <HudChases hud={hud} />
       </PlayScene>
