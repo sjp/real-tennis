@@ -184,9 +184,10 @@ describe("choosing a stroke", () => {
     rally: startRally(start.rally.setup, "a"),
   };
   // Perfect in its stroke, so only the choice is tested.
-  const exact = (ambition: number) => ({
+  const exact = (ambition: number, craft = 0) => ({
     ...AI_PRESETS.hard,
     ambition,
+    craft,
     timing: 0,
     noise: 0,
     aim: 0,
@@ -203,6 +204,19 @@ describe("choosing a stroke", () => {
     const { hits, state } = play(struck, "b", exact(0), 1);
     expect(hits).toEqual(["b"]);
     expect(state.rally.outcome).not.toMatchObject({ reason: "dedans" });
+  });
+
+  it("lays a shorter chase from the hazard end with craft", () => {
+    const chase = (craft: number) => {
+      const { hits, state } = play(struck, "b", exact(0, craft), 1);
+      expect(hits).toEqual(["b"]);
+      const o = state.rally.outcome;
+      expect(o).toMatchObject({ kind: "chase", call: { mark: { side: "service" } } });
+      return o?.kind === "chase" ? o.call.mark.distance : NaN;
+    };
+    const crafted = chase(1);
+    expect(crafted).toBeLessThan(2);
+    expect(crafted).toBeLessThan(chase(0));
   });
 });
 

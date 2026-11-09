@@ -343,6 +343,12 @@ const OPENINGS: Readonly<Record<Side, readonly Stroke[]>> = {
   service: [...strokesOf("lob", [1], [0.3, 0.1]), ...strokesOf("lob", [-1], [-0.8])],
 };
 
+/**
+ * Aims along the court for a cut from the hazard end that lays a short chase,
+ * about a metre from the Dedans wall. Searched offline like OPENINGS. ⚠ verify
+ */
+const SHORT_CHASE = [-0.35, -0.2];
+
 function chooseShot(
   world: World,
   me: Athlete,
@@ -360,6 +366,12 @@ function chooseShot(
   // A boast only reaches the far side from near the net.
   const near = Math.abs(me.motion.position.z) < BOAST_RANGE;
   if (near && random() < preset.boast) return { shot: "boast", aim: { x: 0, y: 0 } };
+  // From the hazard end, a cut that dies near the Dedans wall: a short chase,
+  // hard to beat when they change ends.
+  if (!attacking && me.end === "hazard" && random() < preset.craft) {
+    const x = (random() - 0.5) * 1.2;
+    return bestStroke(world, me, at, rest, strokesOf("cut", [x], SHORT_CHASE)).stroke;
+  }
   // A safe cut deep to the far end: a good chase, beyond the Service Line,
   // or better than the chase being played for.
   return {

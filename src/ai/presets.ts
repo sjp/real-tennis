@@ -14,6 +14,8 @@ export interface AiPreset {
   readonly aim: number;
   /** How often it goes for a winner rather than a safe cut. */
   readonly ambition: number;
+  /** How often it plays for a good chase, rather than a plain safe cut. */
+  readonly craft: number;
   /** How often it plays a boast. */
   readonly boast: number;
   /** How often it weighs up letting the ball go. */
@@ -33,6 +35,7 @@ export const AI_PRESETS: Readonly<Record<AiLevel, AiPreset>> = {
     aim: 0.5,
     ambition: 0.05,
     boast: 0.1,
+    craft: 0.1,
     judgement: 0.1,
     keep: 0.6,
     serves: [4, 1, 0, 1, 0, 0, 0, 0],
@@ -45,6 +48,7 @@ export const AI_PRESETS: Readonly<Record<AiLevel, AiPreset>> = {
     aim: 0.3,
     ambition: 0.15,
     boast: 0.05,
+    craft: 0.5,
     judgement: 0.5,
     keep: 0.6,
     serves: [4, 1, 2, 1, 1, 0, 1, 0],
@@ -57,6 +61,7 @@ export const AI_PRESETS: Readonly<Record<AiLevel, AiPreset>> = {
     aim: 0.15,
     ambition: 0.3,
     boast: 0.05,
+    craft: 0.9,
     judgement: 0.95,
     keep: 0.6,
     serves: [3, 1, 2, 1, 2, 1, 1, 1],
