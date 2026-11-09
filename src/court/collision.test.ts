@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { collisionGeometry, netHeightAt, tileAround, type CollisionPolygon } from "./collision.ts";
 import { standardCourt as court } from "./standard.ts";
-import type { Vec3 } from "./types.ts";
+import type { Vec3, WallRect } from "./types.ts";
 
 const prims = collisionGeometry(court);
 const polygons = prims.filter((p): p is CollisionPolygon => p.kind === "polygon");
@@ -88,5 +88,38 @@ describe("tileAround", () => {
     ];
     const area = tileAround(outer, holes).reduce((a, r) => a + (r.u1 - r.u0) * (r.y1 - r.y0), 0);
     expect(area).toBeCloseTo(40 - 4 - 2);
+  });
+
+  const outer = { u0: 0, u1: 10, y0: 0, y1: 4 };
+  const area = (rs: readonly WallRect[]) =>
+    rs.reduce((a, r) => a + (r.u1 - r.u0) * (r.y1 - r.y0), 0);
+  const overlap = (a: WallRect, b: WallRect) =>
+    Math.min(a.u1, b.u1) > Math.max(a.u0, b.u0) && Math.min(a.y1, b.y1) > Math.max(a.y0, b.y0);
+  const valid = (tiles: readonly WallRect[], holes: readonly WallRect[]) => {
+    for (const t of tiles) {
+      expect(t.u0 >= outer.u0 && t.u1 <= outer.u1 && t.y0 >= outer.y0 && t.y1 <= outer.y1).toBe(
+        true,
+      );
+      expect(holes.some((h) => overlap(t, h))).toBe(false);
+      expect(tiles.some((o) => o !== t && overlap(o, t))).toBe(false);
+    }
+  };
+
+  it("clips a hole that runs past the outer edge", () => {
+    const holes = [{ u0: -2, u1: 2, y0: 1, y1: 3 }];
+    const tiles = tileAround(outer, holes);
+    valid(tiles, holes);
+    expect(area(tiles)).toBeCloseTo(40 - 2 * 2);
+  });
+
+  it("tiles around overlapping holes once", () => {
+    const holes = [
+      { u0: 2, u1: 5, y0: 1, y1: 3 },
+      { u0: 4, u1: 7, y0: 0, y1: 2 },
+    ];
+    const tiles = tileAround(outer, holes);
+    valid(tiles, holes);
+    // The union of the holes: 6 + 6 - 1.
+    expect(area(tiles)).toBeCloseTo(40 - 11);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chaseLabel, chaseName } from "./chase.ts";
+import { chaseLabel, chaseName, ON_LINE_TOLERANCE } from "./chase.ts";
 import { yards } from "./units.ts";
 import { standardCourt as court } from "./standard.ts";
 
@@ -13,6 +13,18 @@ describe("chaseName", () => {
     expect(service(yards(2.5) + 0.03)).toBe("Two and Three");
     expect(service(line("door"))).toBe("the Door");
     expect(hazard(yards(2))).toBe("Hazard Two Yards");
+  });
+
+  it("counts a Fall exactly the tolerance from a line as on it", () => {
+    const two = line("two");
+    for (const d of [two - 0.1, two + 0.1]) {
+      const tolerance = Math.abs(two - d);
+      const name = (t: number) => chaseName(court, { side: "service", distance: d }, t).name;
+      expect(name(tolerance)).toBe("Two");
+      expect(name(tolerance * (1 - 1e-9))).toBe(d < two ? "Better than Two" : "Worse than Two");
+    }
+    expect(service(two + ON_LINE_TOLERANCE * 0.99)).toBe("Two");
+    expect(service(two + ON_LINE_TOLERANCE * 1.01)).toBe("Worse than Two");
   });
 
   it("names a Fall nearer the Dedans wall than Two as better than Two (Law 9.1)", () => {

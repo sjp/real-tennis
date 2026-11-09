@@ -57,6 +57,18 @@ describe("openingAt", () => {
     );
   });
 
+  it("finds the Dedans and the Grille on their own walls only", () => {
+    for (const id of ["dedans", "grille"] as const) {
+      const { wall, rect: r } = court.openings.find((o) => o.id === id)!;
+      const c = { u: mid(r.u0, r.u1), y: mid(r.y0, r.y1) };
+      expect(openingAt(court, { wall, ...c })?.id).toBe(id);
+      expect(
+        openingAt(court, { wall: wall === "dedans" ? "grille" : "dedans", ...c }),
+      ).toBeUndefined();
+      expect(openingAt(court, { wall, u: c.u, y: r.y0 - 0.01 })).toBeUndefined();
+    }
+  });
+
   it("finds nothing below the gallery sill", () => {
     const r = winningGallery.rect;
     expect(openingAt(court, { wall: "side", u: mid(r.u0, r.u1), y: r.y0 / 2 })).toBeUndefined();
