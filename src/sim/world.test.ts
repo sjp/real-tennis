@@ -118,6 +118,26 @@ describe("openings", () => {
     expect(state.live).toBe(false);
   });
 
+  // 192: a shallow ball running along a recess, towards either end.
+  const recessed = court.openings.filter((o) => o.depth > 0);
+  const along = recessed.flatMap((o) =>
+    [-1, 1].flatMap((dir) => [1, 2].map((vin) => [o.id, dir, vin] as const)),
+  );
+  it.each(along)("captures a shallow ball in the %s heading %i at %i m/s", (id, dir, vin) => {
+    const o = court.openings.find((o) => o.id === id)!;
+    const u = (o.rect.u0 + o.rect.u1) / 2;
+    const y = o.rect.y1 - 0.1;
+    const start = {
+      dedans: () => launch(vec(u, y, -hl + 0.05), vec(dir * 6, 0, -vin)),
+      grille: () => launch(vec(u, y, hl - 0.05), vec(dir * 6, 0, vin)),
+      side: () => launch(vec(hw - 0.05, y, u), vec(vin, 0, dir * 6)),
+      main: () => launch(vec(-hw + 0.05, y, u), vec(-vin, 0, dir * 6)),
+    }[o.wall]();
+    const { events } = predict(world, start, 3);
+    expect(types(events)).not.toContain("outOfCourt");
+    expect(events.at(-1)).toMatchObject({ type: "enteredOpening", opening: id });
+  });
+
   it("keeps a ball dropping into a gallery's recess off the floor below", () => {
     const o = court.openings.find((o) => o.id === "winningGallery")!;
     const u = (o.rect.u0 + o.rect.u1) / 2;

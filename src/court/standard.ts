@@ -57,7 +57,8 @@ function gallery(
     outcome,
     rect: span(post ? from + p : from, to - p),
     ...(post && { post: span(from - p, from + p) }),
-    joues: joue ? [side === "service" ? "u0" : "u1"] : [],
+    // Both ends, so a ball can't run out of the recess past the next post (192).
+    joues: joue ? ["u0", "u1"] : [],
     depth: joue ? JOUE_DEPTH : 0,
   };
 }
