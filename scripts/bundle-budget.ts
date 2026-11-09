@@ -8,12 +8,15 @@ import { gzipSync } from "node:zlib";
 
 // Gzip kB per chunk name, about 10% over the sizes at 211.
 const BUDGETS: Record<string, number> = {
-  index: 22, // 18.7
+  // The player and rally modules moved from index to useStepLoop when the ids
+  // left game/practice.ts, so the menu's first load dropped by about 12 kB.
+  index: 8, // 6.5
+  useStepLoop: 18, // 16.4 (the play screens' shared sim, input and scene)
   react: 75, // 68.3
   three: 275, // 252.6
   Sandbox: 80, // 72.2 (leva)
 };
-// Every other chunk: lazy screens and shared modules, the largest 10.1.
+// Every other chunk: lazy screens and shared modules, the largest 6.7.
 const OTHER = 15;
 
 const dir = "dist/assets";
