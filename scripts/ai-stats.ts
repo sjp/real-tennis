@@ -19,12 +19,14 @@ const presets = { A: AI_PRESETS[levels[0]!], B: AI_PRESETS[levels[1]!] };
 const ways: Record<string, number> = {};
 const games = { A: 0, B: 0 };
 const sets = { A: 0, B: 0 };
+const scores: string[] = [];
 let rests = 0;
 let strokes = 0;
 const started = Date.now();
 for (let seed = Number(first); seed < Number(first) + Number(count); seed++) {
   const config = { players, sets: 1, suddenDeath: false } as const;
   const { state, rests: played } = playAi(world, config, presets, seed);
+  scores.push(players.map((p) => String(state.match.setScores[0]?.[p] ?? 0)).join("–"));
   for (const p of players) {
     games[p] += state.match.setScores[0]?.[p] ?? 0;
     sets[p] += state.match.sets[p] ?? 0;
@@ -45,6 +47,7 @@ console.log(`A (${a}) v B (${b}), ${count} one-set matches from seed ${first}`);
 console.log(
   `Sets ${String(sets.A)}–${String(sets.B)}, games ${String(games.A)}–${String(games.B)}`,
 );
+console.log(`Each set: ${scores.join(", ")}`);
 console.log(`${String(rests)} rests, ${(strokes / rests).toFixed(1)} strokes a rest`);
 const touched = Object.entries(ways)
   .filter(([way]) => way.endsWith("touchedByBall"))
