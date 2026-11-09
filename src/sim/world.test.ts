@@ -5,6 +5,7 @@ import { kineticEnergy, standardBall } from "./ball.ts";
 import type { SimEvent } from "./events.ts";
 import { dot, length, madd, normalize, scale, sub, vec, ZERO, type Vec3 } from "./vec.ts";
 import { createWorld, initialState, predict, step, STEP, type SimState } from "./world.ts";
+import { seeded } from "../util/random.ts";
 
 const world = createWorld(court);
 const weightless = createWorld(court, { ...standardBall, gravity: 0 });
@@ -76,8 +77,7 @@ describe("floor bounce", () => {
   });
 
   it("never leaves a live ball asleep (193)", () => {
-    let seed = 7;
-    const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const random = seeded(7);
     const between = (lo: number, hi: number) => lo + random() * (hi - lo);
     for (let i = 0; i < 60; i++) {
       const low = i % 2 === 0;

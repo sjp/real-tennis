@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { standardCourt as court } from "../court/standard.ts";
 import type { SurfaceId } from "../court/collision.ts";
 import { vec } from "../sim/vec.ts";
+import { seeded } from "../util/random.ts";
 import { playRest, rallySetup, startMatch, type MatchState } from "./match.ts";
 import { rally, startRally, type RallyInput, type RallyOutcome } from "./rally.ts";
 
@@ -119,8 +120,7 @@ describe("soak: fuzzed matches through the whole engine", () => {
     const kinds = new Set<string>();
     const found: string[] = [];
     for (let seed = 1; seed <= 24; seed++) {
-      let s = seed * 7919;
-      const random = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      const random = seeded(seed);
       const sets = ([1, 3, 5] as const)[seed % 3]!;
       const config = { players, sets, suddenDeath: seed % 4 === 0 };
       let m = startMatch(court, config, players[seed % 2]!);
