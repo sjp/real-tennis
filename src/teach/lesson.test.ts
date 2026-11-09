@@ -78,3 +78,12 @@ describe("lessons", () => {
     expect(tambour.scores(view("machine"))).toBe(false);
   });
 });
+
+describe("lesson text", () => {
+  it("names the chase the playOff lesson really sets up (233)", () => {
+    const lesson = LESSONS.find((l) => l.id === "playOff")!;
+    if (lesson.setup.kind !== "match") throw new Error("playOff is a match lesson");
+    const chase = lesson.setup.match(court).playOff[0]!;
+    expect(lesson.intro[0]).toContain(`"${chase.name}"`);
+  });
+});
