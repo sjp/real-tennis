@@ -33,7 +33,8 @@ import {
   BallMesh,
   Explanation,
   HelpPanel,
-  PlayCanvas,
+  PlayScene,
+  PlayStage,
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
@@ -168,6 +169,14 @@ function sceneViews(
 
 /** Solo practice: move, hit, and serve, with no opponent. */
 export function Practice() {
+  return (
+    <PlayStage>
+      <PracticeGame />
+    </PlayStage>
+  );
+}
+
+function PracticeGame() {
   const [store] = useState(() => createStore(initialPractice(world)));
   const [explain] = useState(createExplainStore);
   const ex = useExplainer(explain);
@@ -209,7 +218,7 @@ export function Practice() {
 
   return (
     <>
-      <PlayCanvas
+      <PlayScene
         start={{ at: s.motion.position, end: s.end }}
         views={views}
         feature={feature}
@@ -225,7 +234,7 @@ export function Practice() {
           hud={hud}
           blend={blend}
         />
-      </PlayCanvas>
+      </PlayScene>
       {FPS && <FpsMeter />}
       <PracticeHud hud={hud} />
       {touchShown

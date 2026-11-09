@@ -35,7 +35,8 @@ import {
   Explanation,
   HelpPanel,
   HudChases,
-  PlayCanvas,
+  PlayScene,
+  PlayStage,
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
@@ -307,7 +308,7 @@ function LessonGame({
   const { assist } = useSettings();
   return (
     <>
-      <PlayCanvas
+      <PlayScene
         start={{ at: me.motion.position, end: me.end }}
         views={views}
         feature={feature}
@@ -325,7 +326,7 @@ function LessonGame({
           blend={blend}
         />
         <HudChases hud={hud} />
-      </PlayCanvas>
+      </PlayScene>
       {FPS && <FpsMeter />}
       <LessonHud hud={hud} lesson={lesson} />
       {touchShown
@@ -397,34 +398,43 @@ export function Learn() {
     setAttempt((a) => a + 1);
   };
 
-  if (playing !== null) {
-    const lesson = LESSONS[playing]!;
-    return (
-      <LessonGame
-        key={attempt}
-        lesson={lesson}
-        onDone={() => {
-          setDone((d) => {
-            if (d.includes(lesson.id)) return d;
-            const next = [...d, lesson.id];
-            saveDone(next);
-            return next;
-          });
-        }}
-        onNext={
-          playing + 1 < LESSONS.length
-            ? () => {
-                open(playing + 1);
-              }
-            : null
-        }
-        onQuit={() => {
-          setPlaying(null);
-        }}
-      />
-    );
-  }
+  // One canvas for every lesson: the list covers it, and each attempt starts
+  // its game afresh on it (212).
+  return (
+    <PlayStage>
+      {playing === null ? (
+        <List done={done} onOpen={open} />
+      ) : (
+        <LessonGame
+          key={attempt}
+          lesson={LESSONS[playing]!}
+          onDone={() => {
+            const id = LESSONS[playing]!.id;
+            setDone((d) => {
+              if (d.includes(id)) return d;
+              const next = [...d, id];
+              saveDone(next);
+              return next;
+            });
+          }}
+          onNext={
+            playing + 1 < LESSONS.length
+              ? () => {
+                  open(playing + 1);
+                }
+              : null
+          }
+          onQuit={() => {
+            setPlaying(null);
+          }}
+        />
+      )}
+    </PlayStage>
+  );
+}
 
+/** The lessons, each with a tick once done. */
+function List({ done, onOpen }: { done: readonly string[]; onOpen: (i: number) => void }) {
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#101418" }}>
       <div
@@ -452,7 +462,7 @@ export function Learn() {
             <span style={{ width: 16, color: HIGHLIGHT }}>{done.includes(l.id) ? "✓" : ""}</span>
             <button
               onClick={() => {
-                open(i);
+                onOpen(i);
               }}
               style={{ minWidth: "min(260px, 70vw)", textAlign: "left" }}
             >

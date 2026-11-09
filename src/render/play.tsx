@@ -1,5 +1,17 @@
 import { advance, Canvas, useThree } from "@react-three/fiber";
-import { memo, useEffect, useRef, type ReactNode, type RefObject } from "react";
+import {
+  createContext,
+  Fragment,
+  memo,
+  use,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import type { Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { CourtFeature } from "../court/features.ts";
@@ -61,12 +73,94 @@ function StillFrame({ stopped }: { stopped: boolean }) {
   return null;
 }
 
+/** What a game draws on its screen's canvas. */
+interface Scene {
+  /** Which mount of a `PlayScene`: a new one starts its contents afresh. */
+  readonly id: number;
+  readonly node: ReactNode;
+  readonly stopped: boolean;
+}
+
+/** The scene showing on a stage, set by its `PlayScene`. */
+function createSlot() {
+  let scene: Scene | null = null;
+  const listeners = new Set<() => void>();
+  const emit = () => {
+    for (const l of listeners) l();
+  };
+  return {
+    get: () => scene,
+    set: (s: Scene) => {
+      scene = s;
+      emit();
+    },
+    /** Clears `id`'s scene, unless another has already replaced it. */
+    clear: (id: number) => {
+      if (scene?.id !== id) return;
+      scene = null;
+      emit();
+    },
+    subscribe: (l: () => void) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+}
+
+type Slot = ReturnType<typeof createSlot>;
+
+const SlotContext = createContext<Slot | null>(null);
+
 /**
- * The court, lights, player and camera every playing screen draws (210).
- * `children` are the screen's own: its loop, the opponent, chase markers.
- * While `stopped` (the pause menu or the rules is open), nothing is drawn (212).
+ * A playing screen's one canvas (212), kept for as long as the screen, so a
+ * new lesson or match doesn't make a new WebGL context, recompile every
+ * shader and upload the court again. It draws the court and lights; a
+ * `PlayScene` among `children` puts the game on it. With no scene, or one
+ * stopped, the frame loop stops.
  */
-export function PlayCanvas({
+export function PlayStage({ children }: { children: ReactNode }) {
+  const [slot] = useState(createSlot);
+  const scene = useSyncExternalStore(slot.subscribe, slot.get);
+  const stopped = scene?.stopped ?? true;
+  return (
+    <SlotContext value={slot}>
+      <Canvas dpr={DPR} frameloop={stopped ? "never" : "always"} camera={{ fov: 55 }}>
+        <color attach="background" args={["#101418"]} />
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[4, 12, -6]} intensity={1.8} />
+        <directionalLight position={[-6, 8, 10]} intensity={0.6} />
+        <Court court={court} />
+        <Ears />
+        {FPS && <FpsProbe />}
+        {scene && <Fragment key={scene.id}>{scene.node}</Fragment>}
+        <StillFrame stopped={stopped} />
+      </Canvas>
+      {children}
+    </SlotContext>
+  );
+}
+
+/** Puts the camera behind the player, as a game starts. */
+function CameraStart({ at, end }: { at: FloorPoint; end: Side }) {
+  const camera = useThree((s) => s.camera);
+  const [from] = useState(() => cameraStart(at, end));
+  useLayoutEffect(() => {
+    camera.position.set(...from);
+    camera.lookAt(0, 0, 0);
+  }, [camera, from]);
+  return null;
+}
+
+let scenes = 0;
+
+/**
+ * The player and camera every playing screen draws (210), on the canvas of
+ * the `PlayStage` above. `children` are the screen's own: its loop, the
+ * opponent, chase markers. Everything here starts afresh with each mount, e.g.
+ * a new lesson attempt. While `stopped` (the pause menu or the rules is open),
+ * nothing is drawn (212).
+ */
+export function PlayScene({
   start,
   views,
   feature,
@@ -84,19 +178,12 @@ export function PlayCanvas({
   stopped: boolean;
   children: ReactNode;
 }) {
-  return (
-    <Canvas
-      dpr={DPR}
-      frameloop={stopped ? "never" : "always"}
-      camera={{ position: cameraStart(start.at, start.end), fov: 55 }}
-    >
-      <color attach="background" args={["#101418"]} />
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[4, 12, -6]} intensity={1.8} />
-      <directionalLight position={[-6, 8, 10]} intensity={0.6} />
-      <Court court={court} />
-      <Ears />
-      {FPS && <FpsProbe />}
+  const slot = use(SlotContext);
+  if (!slot) throw new Error("A PlayScene needs a PlayStage");
+  const [id] = useState(() => ++scenes);
+  const node = (
+    <>
+      <CameraStart at={start.at} end={start.end} />
       <ServeLine visible={views.serving} />
       <Player view={views.player} />
       {children}
@@ -104,9 +191,18 @@ export function PlayCanvas({
       {markings && <Markings />}
       <AssistRings view={views.assist} on={assist} />
       <FollowCamera target={views.camera} />
-      <StillFrame stopped={stopped} />
-    </Canvas>
+    </>
   );
+  useLayoutEffect(() => {
+    slot.set({ id, node, stopped });
+  });
+  useLayoutEffect(
+    () => () => {
+      slot.clear(id);
+    },
+    [slot, id],
+  );
+  return null;
 }
 
 /** The chase markers on the floor, from the HUD. */

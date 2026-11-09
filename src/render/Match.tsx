@@ -37,7 +37,8 @@ import {
   Explanation,
   HelpPanel,
   HudChases,
-  PlayCanvas,
+  PlayScene,
+  PlayStage,
   PlayTouch,
   type PlayViews,
 } from "./play.tsx";
@@ -340,7 +341,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
   const { assist } = useSettings();
   return (
     <>
-      <PlayCanvas
+      <PlayScene
         start={{ at: me.motion.position, end: me.end }}
         views={views}
         feature={feature}
@@ -360,7 +361,7 @@ function MatchGame({ setup, onQuit }: { setup: Setup; onQuit: () => void }) {
           skip={skip}
         />
         <HudChases hud={hud} />
-      </PlayCanvas>
+      </PlayScene>
       {FPS && <FpsMeter />}
       <MatchHud hud={hud} />
       <Explanation explain={explain} showing={ex.showing} />
@@ -470,13 +471,19 @@ function StartPanel({ onStart }: { onStart: (s: Setup) => void }) {
 /** A singles match against the AI (060). */
 export function Match() {
   const [setup, setSetup] = useState<Setup | null>(null);
-  if (!setup) return <StartPanel onStart={setSetup} />;
+  // One canvas for every match: the start panel covers it (212).
   return (
-    <MatchGame
-      setup={setup}
-      onQuit={() => {
-        setSetup(null);
-      }}
-    />
+    <PlayStage>
+      {setup ? (
+        <MatchGame
+          setup={setup}
+          onQuit={() => {
+            setSetup(null);
+          }}
+        />
+      ) : (
+        <StartPanel onStart={setSetup} />
+      )}
+    </PlayStage>
   );
 }
