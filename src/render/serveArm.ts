@@ -90,3 +90,17 @@ export function groundstrokeArm(angle: number, backhand: boolean): Quaternion {
     new Euler(0, backhand ? -angle * DEG : Math.PI + angle * DEG, 0),
   );
 }
+
+/**
+ * Racket angle about the shoulder, in degrees, through the swing: back to
+ * contact (0, racket out to the side) and on into the follow-through.
+ */
+export function armAngle(t: number): number {
+  if (t < 0) return -20;
+  if (t < SWING_TIME) {
+    const k = t / SWING_TIME;
+    // Take the racket back quickly, then accelerate through.
+    return k < 0.35 ? -20 - (k / 0.35) * 90 : -110 + ((k - 0.35) / 0.65) * 110;
+  }
+  return Math.min(90, ((t - SWING_TIME) / FOLLOW_THROUGH) * 90);
+}

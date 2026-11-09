@@ -14,11 +14,18 @@ import {
   Vector3,
   type Group,
 } from "three";
-import { timeSwing, FOLLOW_THROUGH, type Athlete } from "../game/player.ts";
+import { timeSwing, type Athlete } from "../game/player.ts";
 import { standardPlayer } from "../player/movement.ts";
 import { SERVE_STYLES } from "../player/serve.ts";
-import { SWING_TIME } from "../player/timing.ts";
-import { ARM, groundstrokeArm, HANDLE_LENGTH, HEAD_LENGTH, serveArm } from "./serveArm.ts";
+import { ANKLE, HIP, legPose, SHIN, THIGH } from "./legs.ts";
+import {
+  ARM,
+  armAngle,
+  groundstrokeArm,
+  HANDLE_LENGTH,
+  HEAD_LENGTH,
+  serveArm,
+} from "./serveArm.ts";
 
 const DEG = Math.PI / 180;
 
@@ -53,20 +60,6 @@ function lathe(profile: readonly (readonly [number, number])[]): LatheGeometry {
   );
 }
 
-/**
- * Racket angle about the shoulder, in degrees, through the swing: back to
- * contact (0, racket out to the side) and on into the follow-through.
- */
-function armAngle(t: number): number {
-  if (t < 0) return -20;
-  if (t < SWING_TIME) {
-    const k = t / SWING_TIME;
-    // Take the racket back quickly, then accelerate through.
-    return k < 0.35 ? -20 - (k / 0.35) * 90 : -110 + ((k - 0.35) / 0.65) * 110;
-  }
-  return Math.min(90, ((t - SWING_TIME) / FOLLOW_THROUGH) * 90);
-}
-
 /** A soft round shadow, drawn once and shared. */
 let shadowTexture: CanvasTexture | null = null;
 function blobShadow(): CanvasTexture {
@@ -96,17 +89,12 @@ const GRIP = "#5a3a22";
 const STRINGS = "#f6f1e0";
 const TRIM = "#2f64a8";
 
-const HIP = 0.92;
 /** The racket arm's pivot height. */
 const SHOULDER_Y = standardPlayer.height - 0.38;
 /** The top of the shirt, just above the arm pivots. */
 const SHOULDER_TOP = SHOULDER_Y + 0.03;
 const SHOULDER_WIDTH = 0.21;
 const HIP_WIDTH = 0.095;
-const THIGH = 0.44;
-const SHIN = 0.43;
-/** Height of the ankle joint off the floor. A little short of a straight leg, so the knees stay soft. */
-const ANKLE = 0.07;
 /** Height of the chest band's middle above the belt. */
 const CHEST_BAND = 0.38;
 const HEAD_Y = standardPlayer.height - 0.12;
@@ -122,21 +110,6 @@ const LIFT = 0.12;
 /** How far the free arm is held out from the side, and its swing when running. */
 const FREE_ARM_OUT = 25 * DEG;
 const ARM_SWING = 35 * DEG;
-
-/**
- * Two-bone leg IK: the thigh's swing forwards and sideways from the hip and the
- * knee's bend, for a foot `forward` and `side` of the hip and `lift` off the floor.
- */
-function legPose(forward: number, side: number, lift: number) {
-  const h = HIP - ANKLE - lift;
-  const out = Math.atan2(side, h);
-  const down = Math.hypot(h, side);
-  const d = Math.min(THIGH + SHIN - 1e-3, Math.hypot(down, forward));
-  const thigh =
-    Math.atan2(forward, down) + Math.acos((THIGH * THIGH + d * d - SHIN * SHIN) / (2 * THIGH * d));
-  const knee = Math.PI - Math.acos((THIGH * THIGH + SHIN * SHIN - d * d) / (2 * THIGH * SHIN));
-  return { thigh, knee, out };
-}
 
 /** Position, turn and length of a segment from `a` to `b`, for a y-aligned capsule. */
 function between(a: Vector3, b: Vector3) {
