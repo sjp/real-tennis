@@ -3,10 +3,18 @@ import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { serveSpot } from "../player/serve.ts";
-import type { MatchConfig } from "../rules/match.ts";
+import { startMatch, type MatchConfig } from "../rules/match.ts";
 import { vec, ZERO } from "../sim/vec.ts";
 import { createWorld, initialState, STEP } from "../sim/world.ts";
-import { athleteOf, CALL_PAUSE, playStep, receiveSpot, startPlay, type PlayState } from "./play.ts";
+import {
+  athleteOf,
+  CALL_PAUSE,
+  playFrom,
+  playStep,
+  receiveSpot,
+  startPlay,
+  type PlayState,
+} from "./play.ts";
 
 const world = createWorld(court);
 const config: MatchConfig = { players: ["a", "b"], sets: 1, suddenDeath: false };
@@ -117,5 +125,40 @@ describe("a match", () => {
       s = r.state;
     }
     expect(s.rally.striker).toBeNull();
+  });
+});
+
+describe("playFrom", () => {
+  it("sets up the next rest from any point in a match", () => {
+    const call = chaseName(court, { side: "hazard", distance: 2 });
+    const match = {
+      ...startMatch(court, config, "b"),
+      games: { a: 2, b: 3 },
+      points: { a: 1, b: 2 },
+      playOff: [call],
+    };
+    const s = playFrom(world, match);
+    expect(s).toMatchObject({ phase: "play", match });
+    expect(s.athletes.map((a) => a.id)).toEqual(["a", "b"]);
+    expect(athleteOf(s, "b")).toMatchObject({
+      end: "service",
+      serve: "ready",
+      swing: null,
+      struck: null,
+      motion: { position: serveSpot(court) },
+    });
+    expect(athleteOf(s, "a")).toMatchObject({
+      end: "hazard",
+      serve: null,
+      motion: { position: receiveSpot(world) },
+    });
+    expect(s.rally).toMatchObject({
+      striker: null,
+      outcome: null,
+      setup: { server: "b", receiver: "a", playingFor: call },
+    });
+    // The ball is in the server's hand, out of play until the toss.
+    expect(s.sim).toMatchObject({ live: false, asleep: true });
+    expect(s.sim.ball.position.z).toBeLessThan(0);
   });
 });

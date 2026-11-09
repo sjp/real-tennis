@@ -4,7 +4,10 @@ import { standardCourt as court } from "../court/standard.ts";
 import { playAi } from "../ai/headless.ts";
 import { AI_PRESETS } from "../ai/presets.ts";
 import { createWorld } from "../sim/world.ts";
-import { summarise, type Rest } from "./summary.ts";
+import { startPlay, type PlayState } from "./play.ts";
+import { strokesIn, summarise, type Rest } from "./summary.ts";
+import type { SimEvent } from "../sim/events.ts";
+import { vec } from "../sim/vec.ts";
 
 const rest = (r: Partial<Rest> & Pick<Rest, "outcome">): Rest => ({
   server: "a",
@@ -65,5 +68,31 @@ describe("summarise", () => {
     const s = summarise(config.players, rests);
     expect(s.players[winner]!.rests).toBeGreaterThanOrEqual(4);
     expect(s.longest).toBeGreaterThan(0);
+  });
+});
+
+describe("strokesIn", () => {
+  const world = createWorld(court);
+  const config = { players: ["a", "b"] as const, sets: 1, suddenDeath: false } as const;
+  const playing = startPlay(world, config, () => 0.2, { a: "Player", b: "Opponent" }).state;
+  const at = { time: 0, position: vec(0, 1, 0) };
+  const hit = (player: string): SimEvent => ({
+    ...at,
+    type: "racketHit",
+    player,
+    surface: "racket",
+  });
+  const wall: SimEvent = { ...at, type: "wallHit", surface: "mainWall" };
+
+  it("counts racket hits only", () => {
+    expect(strokesIn(playing, [hit("a"), wall, hit("b")])).toBe(2);
+    expect(strokesIn(playing, [wall])).toBe(0);
+  });
+
+  it("counts nothing once the rest is called or the match is over", () => {
+    for (const phase of ["called", "over"] as const) {
+      const s: PlayState = { ...playing, phase };
+      expect(strokesIn(s, [hit("a")])).toBe(0);
+    }
   });
 });
