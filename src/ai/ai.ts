@@ -94,9 +94,19 @@ function runTo(me: Athlete, to: FloorPoint, speed: number): InputState {
   return { ...IDLE, move: clampMove(-dx * f * k, dz * f * k) };
 }
 
-/** Where it waits between shots: the middle of its end. ⚠ verify */
-export function basePosition(world: World, end: Side): FloorPoint {
-  return { x: 0.5, z: -forwardZ(end) * (world.court.floor.length / 2 - 5) };
+/**
+ * Where it waits between shots: the middle of its end, 5 m from the end wall.
+ * Defending a short chase at the service end, it waits nearer the Dedans
+ * wall, 2 m in front of the chase, to reach the balls that would beat it.
+ * ⚠ verify
+ */
+export function basePosition(world: World, end: Side, rest: RallyState | null = null): FloorPoint {
+  const chase = rest?.setup.playingFor?.mark;
+  const back =
+    chase?.side === "service" && end === "service"
+      ? Math.min(5, Math.max(3, chase.distance + 2))
+      : 5;
+  return { x: 0.5, z: -forwardZ(end) * (world.court.floor.length / 2 - back) };
 }
 
 /** Steps a swing takes from the press to contact, rounded up. */
@@ -349,6 +359,16 @@ const OPENINGS: Readonly<Record<Side, readonly Stroke[]>> = {
  */
 const SHORT_CHASE = [-0.35, -0.2];
 
+/**
+ * Aims along the court to try, shortest chase first, when attacking a chase:
+ * from the hazard end towards the Dedans wall, and from the service end
+ * towards the Service Line or beyond it. ⚠ verify
+ */
+const BEAT_CHASE: Readonly<Record<Side, readonly number[]>> = {
+  hazard: [...SHORT_CHASE, 0.2],
+  service: [-0.2, 0.3, 0.8],
+};
+
 function chooseShot(
   world: World,
   me: Athlete,
@@ -357,7 +377,17 @@ function chooseShot(
   preset: AiPreset,
   random: () => number,
 ): Stroke {
-  const attacking = rest.setup.playingFor !== null && rest.setup.playingFor.mark.side !== me.end;
+  const chase = rest.setup.playingFor;
+  const attacking = chase !== null && chase.mark.side !== me.end;
+  if (chase !== null && random() < preset.craft) {
+    const x = (random() - 0.5) * 1.2;
+    // Defending: a Fall anywhere on the attacker's side wins (Law 9.3(b)),
+    // so a safe cut, not too deep.
+    if (!attacking) return { shot: "cut", aim: { x, y: random() * 0.4 - 0.1 } };
+    // Attacking: whichever stroke its forecast says beats the chase.
+    const best = bestStroke(world, me, at, rest, strokesOf("cut", [x], BEAT_CHASE[me.end]));
+    if (best.value === 1) return best.stroke;
+  }
   // Going for an opening, when one of the strokes for it would go in from here.
   if (!attacking && random() < preset.ambition) {
     const best = bestStroke(world, me, at, rest, OPENINGS[me.end]);
@@ -450,7 +480,7 @@ function makePlan(
   }
   const path = states.map((s) => s.ball.position);
   const f = forwardZ(me.end);
-  const base = basePosition(world, me.end);
+  const base = basePosition(world, me.end, view.rally);
 
   const pos = me.motion.position;
   const dist = (s: FloorPoint) => Math.hypot(s.x - pos.x, s.z - pos.z);
@@ -504,7 +534,12 @@ function makePlan(
 
   const leave = outcomeValue(world, left.outcome, me.id, me.end);
   const target = settled ?? afterBounce ?? first;
-  const judged = random() < preset.judgement;
+  // Defending a chase, it weighs up every ball it can, since a ball that
+  // falls worse than the chase wins it the rest.
+  const chase = view.rally.setup.playingFor;
+  const defending = chase !== null && chase.mark.side === me.end;
+  const care = defending ? Math.max(preset.judgement, preset.craft) : preset.judgement;
+  const judged = random() < care;
   if (target === null || (judged && leave > preset.keep)) {
     // Keep out of its way: the ball touching a player loses the rest.
     const stand = clearSpot(world, me, path, states, capsule, preset.speed, target ? pos : base);
@@ -594,7 +629,7 @@ export function aiInput(
   const coming = r.striker !== null && r.striker !== me.id && sim.live && !sim.asleep;
   if (!coming) {
     const plan = {
-      stand: basePosition(world, me.end),
+      stand: basePosition(world, me.end, r),
       swingAt: null,
       shot: me.shot,
       aim: IDLE.move,

@@ -220,6 +220,39 @@ describe("choosing a stroke", () => {
   });
 });
 
+describe("playing off a chase", () => {
+  const start = startPlay(world, config, () => 0.2, labels).state;
+  // Playing off a chase of a yard at the service end: a defends it there.
+  const setup = {
+    ...start.rally.setup,
+    playingFor: chaseName(court, { side: "service", distance: 0.9144 }),
+  };
+  // b's soft ball from the hazard end, falling far worse than a yard.
+  const from = vec(0, 1.5, 6);
+  const velocity = aimAt(world.ball, from, vec(1, world.ball.radius, -6), ZERO, {
+    elevation: 0.5,
+  });
+  const struck: PlayState = {
+    ...start,
+    athletes: start.athletes.map((a) =>
+      a.id === "a"
+        ? { ...a, serve: null, motion: { position: { x: 1, z: -8 }, velocity: { x: 0, z: 0 } } }
+        : a,
+    ) as never,
+    sim: initialState({ position: from, velocity, spin: ZERO }, start.sim.time),
+    rally: { ...startRally(setup, "b"), crossed: true },
+  };
+  const careless = { ...AI_PRESETS.hard, judgement: 0, timing: 0 };
+
+  it("lets a ball go that falls worse than the chase it defends", () => {
+    // Without craft or judgement, it plays the ball.
+    expect(play(struck, "a", { ...careless, craft: 0 }, 1).hits).toEqual(["a"]);
+    const { hits, state } = play(struck, "a", { ...careless, craft: 1 }, 1);
+    expect(hits).toEqual([]);
+    expect(state.rally.outcome).toMatchObject({ kind: "point", winner: "a", reason: "chaseLost" });
+  });
+});
+
 describe("planning a stroke", () => {
   const start = startPlay(world, config, () => 0.2, labels).state;
 
@@ -268,6 +301,21 @@ describe("basePosition", () => {
   it("waits in the middle of its own end, 5 m from the end wall", () => {
     expect(basePosition(world, "service")).toEqual({ x: 0.5, z: -(hl - 5) });
     expect(basePosition(world, "hazard")).toEqual({ x: 0.5, z: hl - 5 });
+  });
+
+  it("waits nearer the Dedans wall when defending a short chase there", () => {
+    const rest = (side: "service" | "hazard", distance: number) =>
+      startRally({
+        court,
+        server: "a",
+        receiver: "b",
+        playingFor: chaseName(court, { side, distance }),
+      });
+    expect(basePosition(world, "service", rest("service", 0.5))).toEqual({ x: 0.5, z: -(hl - 3) });
+    expect(basePosition(world, "service", rest("service", 2))).toEqual({ x: 0.5, z: -(hl - 4) });
+    // A long chase, or one at the other end, leaves it in the middle.
+    expect(basePosition(world, "service", rest("service", 6))).toEqual({ x: 0.5, z: -(hl - 5) });
+    expect(basePosition(world, "service", rest("hazard", 1))).toEqual({ x: 0.5, z: -(hl - 5) });
   });
 });
 
