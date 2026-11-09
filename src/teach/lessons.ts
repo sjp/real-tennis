@@ -119,9 +119,10 @@ export const LESSONS: readonly Lesson[] = [
       "Three openings win the rest outright: the Dedans, the big net behind the service end; the Grille, in the far corner by the Main Wall; and the Winning Gallery, the last gallery under the penthouse at the hazard end.",
       "From the hazard end the Dedans is the big target. {hold} a direction as you strike to aim: forward to hit deeper, back to hit shorter, left or right to go sideways. A {lob} carries all the way to the back wall.",
     ],
-    goal: "Hit a ball into the Dedans, the Grille or the Winning Gallery",
+    goal: "Hit a ball into the Dedans",
     count: 1,
-    scores: (v) => won(v) && called(v, "dedans", "grille", "winningGallery"),
+    // The Grille and the Winning Gallery are behind you at the hazard end (232).
+    scores: (v) => won(v) && called(v, "dedans"),
     setup: { kind: "drill", end: "hazard", feed: "machine" },
     success: "In it goes! Openings are the most direct way to win a rest.",
     feature: "opening:dedans",
@@ -131,7 +132,7 @@ export const LESSONS: readonly Lesson[] = [
     title: "Laying a chase",
     intro: [
       "When the ball bounces twice (Falls) at the service end, it isn't a point. The Marker lays a chase: they name where it fell, by the lines on the floor, and it's played for later.",
-      "From the hazard end, hit the ball so it Falls at the service end. The nearer the net it falls, the better the chase is for you.",
+      "From the hazard end, hit the ball so it Falls at the service end. The nearer the back wall it falls, the harder the chase is for your opponent to beat.",
     ],
     goal: "Lay a chase at the service end",
     count: 1,
@@ -210,7 +211,7 @@ export const LESSONS: readonly Lesson[] = [
     id: "game",
     title: "A full game",
     intro: [
-      "Put it all together: play a whole game against the Easy opponent, from the toss.",
+      "Put it all together: play a whole game against the Easy opponent, who serves first.",
       "The Marker calls the score and the chases as you go. {rules}",
     ],
     goal: "Play a game to the end",

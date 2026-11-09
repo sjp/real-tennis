@@ -159,7 +159,7 @@ export const EXPLANATIONS: Readonly<Record<TeachingId, Explanation>> = {
   chaseLaid: {
     title: "A chase",
     text: "A ball that Falls on the service side, or in the Hazard Court, doesn't win or lose the rest. Instead the Marker lays a chase: the spot is remembered and played for later, when the players change ends. The score doesn't change yet.",
-    tip: "At the service end, a chase near the back wall is a good one to have laid against you: it's hard for your opponent to beat.",
+    tip: "At the service end, a chase near the back wall is a good one to lay: it's hard for your opponent to beat later.",
     feature: "chaseLines",
   },
   chaseTheLine: {
@@ -170,7 +170,7 @@ export const EXPLANATIONS: Readonly<Record<TeachingId, Explanation>> = {
   changeEnds: {
     title: "Change ends",
     text: "In real tennis you only change ends because of chases. The players change when two chases are laid, or when one is laid and either player is on forty or advantage. The receiver becomes the server.",
-    tip: "Winning a chase also wins you the service end.",
+    tip: "Ends change only after chases are laid; whoever is then at the service end serves.",
     feature: "hazardEnd",
   },
   playOff: {
