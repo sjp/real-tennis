@@ -20,28 +20,85 @@ export const ear: { current: Ear } = {
   current: { position: { x: 0, y: 2, z: 0 }, right: { x: -1, y: 0, z: 0 } },
 };
 
-function start() {
-  if (graph) {
-    if (graph.ctx.state === "suspended") void graph.ctx.resume();
-    return;
-  }
-  const Ctx = window.AudioContext as typeof AudioContext | undefined;
-  if (!Ctx) return;
-  const ctx = new Ctx();
+function makeGraph(ctx: AudioContext): Graph {
   const master = ctx.createGain();
   master.gain.value = volume;
   master.connect(ctx.destination);
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  graph = { ctx, master, noise };
+  return { ctx, master, noise };
 }
+
+/**
+ * Gestures that may unlock sound. A touch `pointerdown` doesn't count as a
+ * user activation; `pointerup`, `touchend` and `click` do, and iOS Safari has
+ * only ever unlocked on `touchend` or `click` (203).
+ */
+export const GESTURES = ["pointerdown", "pointerup", "touchend", "click", "keydown"] as const;
+
+/** The parts of an AudioContext the unlocker uses. */
+export interface Resumable {
+  readonly state: string;
+  resume(): Promise<void>;
+  addEventListener(type: "statechange", listener: () => void): void;
+}
+
+/**
+ * Keeps sound running: makes the context on the first gesture, resumes it on
+ * any gesture while it isn't running (suspended, or iOS's "interrupted" after a
+ * call), and listens for gestures only while it needs one.
+ */
+export function audioUnlocker<C extends Resumable>(
+  target: Pick<EventTarget, "addEventListener" | "removeEventListener">,
+  make: () => C | null,
+  ready: (ctx: C) => void = () => {},
+) {
+  let ctx: C | null = null;
+  let armed = false;
+  const update = () => {
+    if (ctx?.state === "running") disarm();
+    else arm();
+  };
+  const unlock = () => {
+    if (!ctx) {
+      ctx = make();
+      if (!ctx) return;
+      ctx.addEventListener("statechange", update);
+      ready(ctx);
+    }
+    if (ctx.state !== "running") void ctx.resume().then(update, () => {});
+    update();
+  };
+  function arm() {
+    if (armed) return;
+    armed = true;
+    for (const type of GESTURES) target.addEventListener(type, unlock, { capture: true });
+  }
+  function disarm() {
+    if (!armed) return;
+    armed = false;
+    for (const type of GESTURES) target.removeEventListener(type, unlock, { capture: true });
+  }
+  return { arm, unlock, armed: () => armed, context: () => ctx };
+}
+
+let unlocker: ReturnType<typeof audioUnlocker<AudioContext>> | null = null;
 
 /** Starts sound on the first gesture. Safe to call more than once. */
 export function armAudio() {
-  if (typeof window === "undefined") return;
-  for (const type of ["pointerdown", "keydown"] as const)
-    window.addEventListener(type, start, { capture: true });
+  if (typeof window === "undefined" || unlocker) return;
+  unlocker = audioUnlocker(
+    window,
+    () => {
+      const Ctx = window.AudioContext as typeof AudioContext | undefined;
+      return Ctx ? new Ctx() : null;
+    },
+    (ctx) => {
+      graph = makeGraph(ctx);
+    },
+  );
+  unlocker.arm();
 }
 
 export function setVolume(v: number) {
