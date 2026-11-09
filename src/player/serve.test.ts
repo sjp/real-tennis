@@ -12,6 +12,7 @@ import {
   secondGalleryLineZ,
   SERVE_STYLES,
   serveSpot,
+  serveVelocity,
   toss,
   type ServeStyle,
 } from "./serve.ts";
@@ -75,5 +76,40 @@ describe("serving position", () => {
     expect(overServiceLine(court, standardPlayer, { x: 0, z })).toBe(true);
     expect(overServiceLine(court, standardPlayer, { x: 0, z: z + 1 })).toBe(true);
     expect(overServiceLine(court, standardPlayer, { x: 0, z: z - 0.5 })).toBe(false);
+  });
+});
+
+describe("serveVelocity", () => {
+  const DEG = Math.PI / 180;
+  const style = SERVE_STYLES[0]!;
+  const angles = (aim = IDLE.move, s = style) => {
+    const v = serveVelocity(s, "service", aim);
+    const flat = Math.hypot(v.x, v.z);
+    return {
+      speed: Math.hypot(flat, v.y),
+      elevation: Math.atan2(v.y, flat) / DEG,
+      // Towards the Side Penthouse (+x), from straight down the court.
+      heading: Math.atan2(v.x, v.z) / DEG,
+    };
+  };
+
+  it.each(SERVE_STYLES.map((s) => [s.name, s] as const))(
+    "launches a %s at its speed, elevation and heading",
+    (_, s) => {
+      const a = angles(IDLE.move, s);
+      expect(a.speed).toBeCloseTo(s.speed);
+      expect(a.elevation).toBeCloseTo(s.elevation);
+      expect(a.heading).toBeCloseTo(s.heading);
+    },
+  );
+
+  it("nudges the serve up to 3° with the move input, keeping its speed", () => {
+    const base = angles();
+    expect(angles({ x: 0, y: 1 }).elevation).toBeCloseTo(base.elevation + 3);
+    expect(angles({ x: 0, y: -1 }).elevation).toBeCloseTo(base.elevation - 3);
+    // Aiming right turns it away from the Side Penthouse.
+    expect(angles({ x: 1, y: 0 }).heading).toBeCloseTo(base.heading - 3);
+    expect(angles({ x: -0.5, y: 0 }).heading).toBeCloseTo(base.heading + 1.5);
+    expect(angles({ x: 1, y: 1 }).speed).toBeCloseTo(style.speed);
   });
 });
