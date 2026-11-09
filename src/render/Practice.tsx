@@ -77,8 +77,7 @@ const Loop = memo(function Loop({
       const r = practiceStep(world, before, input, settings.get().autoHit);
       hear(r.events, length(before.sim.ball.velocity), () => before.shot);
       store.set(r.state);
-      if (before.shot !== r.state.shot || before.serveStyle !== r.state.serveStyle)
-        hud.set({ choice: choice(r.state) });
+      if (choice(before) !== choice(r.state)) hud.set({ choice: choice(r.state) });
       for (const n of r.notices) hud.set(describeNotice(n));
       const rally = r.state.rally;
       explainCalls(explain, r.calls, rally?.outcome !== null || rally.striker === null);

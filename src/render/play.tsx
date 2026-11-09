@@ -120,22 +120,22 @@ export function Explanation({
   );
 }
 
-/** The touch controls, re-reading the player's choices whenever the HUD changes. */
-export function PlayTouch<H>({
+/** The touch controls, re-reading the player's choices whenever the HUD's `choice` changes. */
+export function PlayTouch({
   hud,
   athlete,
   pad,
   ui,
   extras,
 }: {
-  hud: HudStore<H>;
+  hud: HudStore<{ readonly choice: string }>;
   athlete: () => { readonly serve: unknown; readonly serveStyle: number; readonly shot: ShotType };
   pad: Touch;
   ui: PlayUi;
   extras?: readonly Extra[];
 }) {
-  // The player's choices change along with the HUD, so re-read them on every update.
-  useHud(hud, (h) => h);
+  // The HUD's `choice` describes everything the controls show of the player's choices.
+  useHud(hud, (h) => h.choice);
   return (
     <TouchControls
       touch={pad}
