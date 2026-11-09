@@ -1,11 +1,11 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useState } from "react";
-import { featureShape } from "../court/features.ts";
+import { featureName, featureShape } from "../court/features.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { ENTRIES, TOPICS, type Entry } from "../teach/reference.ts";
 import { Court } from "./Court.tsx";
-import { useMedia } from "./media.ts";
+import { useMedia, useReducedMotion } from "./media.ts";
 import { Highlight } from "./teach.tsx";
 import { DPR, HIGHLIGHT } from "./view.ts";
 
@@ -23,6 +23,7 @@ const POINTS: readonly [string, string][] = [
 /** A small 3D court with the entry's feature lit up; drag to look around. */
 function CourtView({ entry }: { entry: Entry }) {
   const shape = featureShape(court, entry.feature!);
+  const reduced = useReducedMotion();
   const at = shape.label;
   const n = shape.polygons[0]!.normal;
   // Floors and roofs from above; walls and openings from in front, below the penthouses.
@@ -32,13 +33,20 @@ function CourtView({ entry }: { entry: Entry }) {
       : [at.x + n.x * 8, Math.max(1.6, at.y + 0.5), at.z + n.z * 8 - 2 * Math.abs(n.x)];
   return (
     <div style={{ height: "min(320px, 60vh)", borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
-      <Canvas key={entry.id} dpr={DPR} camera={{ position: from, fov: 50 }}>
+      <Canvas
+        key={entry.id}
+        dpr={DPR}
+        camera={{ position: from, fov: 50 }}
+        role="img"
+        aria-label={`The court, with ${featureName(court, entry.feature!)} lit up`}
+      >
         <color attach="background" args={["#101418"]} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[4, 12, -6]} intensity={1.6} />
         <Court court={court} />
         <Highlight feature={entry.feature!} />
-        <OrbitControls target={[at.x, at.y, at.z]} />
+        {/* No drift after a drag with reduced motion (213). */}
+        <OrbitControls target={[at.x, at.y, at.z]} enableDamping={!reduced} />
       </Canvas>
     </div>
   );
