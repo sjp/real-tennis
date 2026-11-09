@@ -161,7 +161,11 @@ class Rally {
 
   struck(player: PlayerId, z: number): RallyStep {
     const s = this.s;
-    if (s.striker === null) return this.next({ striker: player, service: true });
+    if (s.striker === null)
+      // Only the server can start the rest; anyone else's hit is ignored (230).
+      return player === s.setup.server
+        ? this.next({ striker: player, service: true })
+        : this.next({});
     if (player === s.striker)
       return s.service ? this.fault("faultDoubleHit") : this.lose(player, "doubleHit");
     if (s.service && !s.penthouse) return this.lose(player, "volleyBeforePenthouse");

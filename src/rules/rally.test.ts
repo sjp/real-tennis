@@ -221,6 +221,13 @@ describe("service (Law 8.1(d))", () => {
     expect(o).toBeNull();
   });
 
+  it("ignores a hit by the receiver before the service (230)", () => {
+    const r = rally(startRally(setup), hit(R, 3));
+    expect(r.state.striker).toBeNull();
+    // The real service is then judged as normal.
+    expect(play([hit(R, 3), ...goodService]).outcome).toBeNull();
+  });
+
   it("ignores the toss before the service is struck", () => {
     expect(outcome([bounce(hw - 2, -4), ...goodService])).toBeNull();
   });
