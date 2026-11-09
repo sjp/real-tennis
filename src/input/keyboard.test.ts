@@ -37,6 +37,26 @@ describe("keyboard", () => {
     kb.dispose();
   });
 
+  it("lets go of held keys when the window loses focus", () => {
+    const kb = keyboard(target, doc);
+    key("keydown", "KeyD");
+    target.dispatchEvent(new Event("blur"));
+    expect(kb.read().move).toEqual({ x: 0, y: 0 });
+    kb.dispose();
+  });
+
+  it("picks shots and serves with 1 to 8, and nothing past them", () => {
+    const kb = keyboard(target);
+    for (const n of [1, 5, 6, 7, 8]) {
+      key("keydown", `Digit${String(n)}`);
+      expect(kb.read().select).toBe(n);
+    }
+    key("keydown", "Digit9");
+    key("keydown", "Digit0");
+    expect(kb.read().select).toBeNull();
+    kb.dispose();
+  });
+
   it("tells browser shortcuts from game keys (202)", () => {
     const none = { ctrlKey: false, metaKey: false, altKey: false };
     expect(withModifier(none)).toBe(false);
