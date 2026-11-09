@@ -25,3 +25,6 @@ export function useMedia(query: string): boolean {
     () => listOf(query).matches,
   );
 }
+
+/** The player asked for less motion: no pulsing, and camera cuts instead of pans (213). */
+export const useReducedMotion = () => useMedia("(prefers-reduced-motion: reduce)");

@@ -3,6 +3,7 @@ import { memo, useRef } from "react";
 import { Vector3, type Mesh } from "three";
 import { standardCourt as court } from "../court/standard.ts";
 import type { FloorPoint, Side, Vec3 } from "../court/types.ts";
+import { useReducedMotion } from "./media.ts";
 import { BEHIND, cameraHeight } from "./view.ts";
 import {
   assist,
@@ -37,6 +38,7 @@ const SHIFT = 0.5;
  * the penthouse and may sit behind the wall, which is drawn one-sided and so
  * seen through, like the view from the dedans. Swings round on a change of
  * ends. Given a `focus`, it leaves the player to look at that from mid-court.
+ * With reduced motion it cuts instead: to the focus, back, and round (213).
  */
 export const FollowCamera = memo(function FollowCamera({
   target,
@@ -46,15 +48,21 @@ export const FollowCamera = memo(function FollowCamera({
   const camera = useThree((s) => s.camera);
   const look = useRef(new Vector3(0, 1, 0));
   const yaw = useRef<number | null>(null);
+  const reduced = useReducedMotion();
+  const was = useRef<{ focus: boolean; end: Side | null }>({ focus: false, end: null });
   useFrame((_, delta) => {
     const { at, end, ball, focus } = target();
-    const k = Math.min(1, delta / FOLLOW);
+    const cut = reduced && (!!focus || was.current.focus || was.current.end !== end);
+    was.current.focus = !!focus;
+    was.current.end = end;
+    const k = cut ? 1 : Math.min(1, delta / FOLLOW);
     if (focus) {
       const away = focus.z > 0 ? -1 : 1;
       const from = new Vector3(focus.x * 0.3, 7, focus.z + away * 10);
       from.z = Math.max(-hl, Math.min(hl, from.z));
-      camera.position.lerp(from, k / 3);
-      look.current.lerp(new Vector3(focus.x, focus.y, focus.z), k / 3);
+      const pan = cut ? 1 : k / 3;
+      camera.position.lerp(from, pan);
+      look.current.lerp(new Vector3(focus.x, focus.y, focus.z), pan);
       camera.lookAt(look.current);
       return;
     }
@@ -62,7 +70,7 @@ export const FollowCamera = memo(function FollowCamera({
     yaw.current ??= want;
     let turn = want - yaw.current;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    yaw.current += turn * Math.min(1, delta / TURN);
+    yaw.current += turn * (cut ? 1 : Math.min(1, delta / TURN));
     const fx = Math.sin(yaw.current);
     const fz = Math.cos(yaw.current);
     const { x, z } = at;

@@ -8,6 +8,7 @@ import { EXPLANATIONS } from "../teach/content.ts";
 import { word } from "../teach/wording.ts";
 import { useDismissKeys } from "./dismissKeys.ts";
 import { useTouchShown } from "./inputMode.ts";
+import { useReducedMotion } from "./media.ts";
 import { polygonGeometry } from "./geometry.ts";
 import { HIGHLIGHT, panel } from "./view.ts";
 
@@ -26,6 +27,9 @@ export const Highlight = memo(function Highlight({
   const shape = useMemo(() => featureShape(court, feature), [feature]);
   const geometry = useMemo(() => polygonGeometry(shape.polygons), [shape]);
   const material = useRef<MeshBasicMaterial>(null);
+  // Steady, not pulsing, with reduced motion (213).
+  const reduced = useReducedMotion();
+  const pulsing = pulse && !reduced;
   useEffect(
     () => () => {
       geometry.dispose();
@@ -33,8 +37,8 @@ export const Highlight = memo(function Highlight({
     [geometry],
   );
   useFrame(({ clock }) => {
-    if (material.current && pulse)
-      material.current.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 4);
+    if (material.current)
+      material.current.opacity = pulsing ? 0.35 + 0.25 * Math.sin(clock.elapsedTime * 4) : 0.45;
   });
   const { x, y, z } = shape.label;
   return (
