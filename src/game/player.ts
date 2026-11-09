@@ -102,8 +102,13 @@ export const rightX = (end: Side) => -forwardZ(end);
 
 /** Where the racket would ideally meet the ball, on either side. */
 export function idealContact(m: Motion, end: Side, backhand: boolean): Vec3 {
-  const side = (backhand ? -1 : 1) * rightX(end) * SIDE_REACH;
-  return vec(m.position.x + side, 1, m.position.z + forwardZ(end) * AHEAD);
+  const o = idealOffset(end, backhand);
+  return vec(m.position.x + o.x, 1, m.position.z + o.z);
+}
+
+/** The ideal contact point's offset across and along the court from the body. */
+export function idealOffset(end: Side, backhand: boolean): { x: number; z: number } {
+  return { x: (backhand ? -1 : 1) * rightX(end) * SIDE_REACH, z: forwardZ(end) * AHEAD };
 }
 
 /** How far a ball at `b` is from being nicely in reach on one side. */

@@ -1,5 +1,5 @@
 import type { ChaseMark, FloorPoint, Side } from "../court/types.ts";
-import { HIGH, LOW, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
+import { HIGH, idealOffset, LOW, serveMiss, type Athlete } from "../game/player.ts";
 import { clampMove, IDLE, SHOT_TYPES, type InputState, type ShotType } from "../input/input.ts";
 import { clampToEnd, forwardZ, move, standardPlayer } from "../player/movement.ts";
 import { planShot } from "../player/shot.ts";
@@ -279,8 +279,8 @@ function hitsBody(
 
 /** Where to stand so the ball at `at` meets the racket at its ideal contact point. */
 function standFor(at: Vec3, end: Side, backhand: boolean): FloorPoint {
-  const side = (backhand ? -1 : 1) * rightX(end) * SIDE_REACH;
-  return { x: at.x - side, z: at.z - forwardZ(end) * 0.3 };
+  const o = idealOffset(end, backhand);
+  return { x: at.x - o.x, z: at.z - o.z };
 }
 
 /** The stroke it plays: a shot type and the move input held at contact. */

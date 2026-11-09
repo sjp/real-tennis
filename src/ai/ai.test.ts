@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { chaseName } from "../court/chase.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { athleteOf, playStep, startPlay, type PlayState } from "../game/play.ts";
-import { playerCapsule, rightX, serveMiss, SIDE_REACH, type Athlete } from "../game/player.ts";
-import { forwardZ } from "../player/movement.ts";
+import { idealOffset, playerCapsule, serveMiss, type Athlete } from "../game/player.ts";
 import { IDLE, type InputState } from "../input/input.ts";
 import { SERVE_STYLES, serveSpot, toss } from "../player/serve.ts";
 import { aimAt } from "../player/shot.ts";
@@ -265,8 +264,8 @@ describe("planning a stroke", () => {
       serve: null,
       motion: { position: { x: 1, z: 6 }, velocity: { x: 0, z: 0 } },
     };
-    const f = forwardZ(me.end);
-    const from = vec(1 + rightX(me.end) * SIDE_REACH, 0.9, 6 + f * 0.3);
+    const o = idealOffset(me.end, false);
+    const from = vec(1 + o.x, 0.9, 6 + o.z);
     const sim = initialState({ position: from, velocity: vec(0, 1.5, 0), spin: ZERO }, 3);
     const rally = { ...startRally(start.rally.setup, "a"), crossed: true, drop: "hazard" as const };
     const sure = { ...AI_PRESETS.hard, reaction: 0, timing: 0, noise: 0, judgement: 0 };

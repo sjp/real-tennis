@@ -1,12 +1,9 @@
 import type { Side } from "../court/types.ts";
+import { HIGH, LOW, SIDE_REACH } from "./player.ts";
 import { forwardZ, standardPlayer, type Motion } from "../player/movement.ts";
 import type { Vec3 } from "../sim/vec.ts";
 import { predict, STEP, type Prediction, type SimState, type World } from "../sim/world.ts";
 
-/** How far the racket reaches from the body's centre. ⚠ verify */
-const REACH = 0.7;
-const LOW = 0.2;
-const HIGH = 1.8;
 /** Seconds of ball flight the hit assist looks ahead. */
 export const ASSIST_HORIZON = 3;
 /** Seconds of flight added at a time as a kept prediction runs short. */
@@ -47,7 +44,7 @@ export function assist(
     const t = (i - first) * STEP;
     const p = prediction.path[i]!;
     if (p.z * f > 0 || p.y < LOW || p.y > HIGH) continue;
-    const gap = Math.hypot(p.x - x, p.z - z) - REACH;
+    const gap = Math.hypot(p.x - x, p.z - z) - SIDE_REACH;
     // The player always sprints (170).
     if (gap <= standardPlayer.sprintSpeed * t) intercept = p;
   }
