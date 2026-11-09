@@ -25,6 +25,23 @@ describe("collisionGeometry", () => {
     expect(backwards).toEqual([]);
   });
 
+  it("gives each post-less opening edges at its sill, lintel and ends (195)", () => {
+    const segments = prims.filter((p) => p.kind === "segment");
+    for (const o of court.openings.filter((o) => !o.post)) {
+      const ys = segments.filter((p) => p.a.y === p.b.y).map((p) => p.a.y);
+      expect(ys).toContain(o.rect.y0);
+      expect(ys).toContain(o.rect.y1);
+      // Each end has an edge: its own, or the next gallery's post.
+      const uOf = (v: Vec3) => (o.wall === "side" ? v.z : v.x);
+      for (const end of ["u0", "u1"] as const) {
+        const edge = segments.find(
+          (p) => p.a.y !== p.b.y && uOf(p.a) === o.rect[end] && uOf(p.b) === o.rect[end],
+        );
+        expect(edge, `${o.id} ${end}`).toBeDefined();
+      }
+    }
+  });
+
   it("has one sensor per opening", () => {
     const sensors = prims.filter((p) => p.kind === "opening").map((p) => p.opening);
     expect(sensors.toSorted()).toEqual(court.openings.map((o) => o.id).toSorted());

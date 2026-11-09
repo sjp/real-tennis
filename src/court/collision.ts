@@ -227,6 +227,18 @@ export function collisionGeometry(court: CourtDefinition): CollisionPrimitive[] 
           );
         }
       }
+      // A post-less opening's edges, so it's no bigger than it looks (195).
+      if (!o.post) {
+        const bordered = (u: number) =>
+          special.some(([p]) => (p.u0 === u || p.u1 === u) && p.y0 < r.y1 && p.y1 > r.y0);
+        seg(WALL_SURFACE[wall], frame.at(r.u0, r.y0), frame.at(r.u1, r.y0));
+        seg(WALL_SURFACE[wall], frame.at(r.u0, r.y1), frame.at(r.u1, r.y1));
+        for (const end of ["u0", "u1"] as const) {
+          if (bordered(r[end])) continue;
+          const surface = o.joues.includes(end) ? (`joue:${o.id}` as const) : WALL_SURFACE[wall];
+          seg(surface, frame.at(r[end], r.y0), frame.at(r[end], r.y1));
+        }
+      }
       out.push({
         kind: "opening",
         opening: o.id,
