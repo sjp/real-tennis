@@ -18,7 +18,8 @@ import {
   serveContact,
   type AiMemory,
 } from "./ai.ts";
-import { seeded, viewOf } from "./headless.ts";
+import { viewOf } from "./headless.ts";
+import { seeded } from "../util/random.ts";
 import { AI_PRESETS, type AiPreset } from "./presets.ts";
 
 const world = createWorld(court);
@@ -86,7 +87,7 @@ describe("the AI", () => {
   });
 
   it("serves just as well when player b wins the toss", () => {
-    // `seeded` gives player a the toss for every small seed (235), so force it.
+    // Force the toss, so player b serves whatever the seed.
     const b = startPlay(world, config, () => 0.9, labels).state;
     expect(b.match.server).toBe("b");
     const serves = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seed) =>

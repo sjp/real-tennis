@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { aiInput, FRESH } from "../ai/ai.ts";
-import { seeded } from "../ai/headless.ts";
 import { AI_PRESETS } from "../ai/presets.ts";
 import { standardCourt as court } from "../court/standard.ts";
 import { playerCapsule } from "../game/player.ts";
 import type { InputState } from "../input/input.ts";
 import { createWorld } from "../sim/world.ts";
+import { seeded } from "../util/random.ts";
 import { learner, lessonStep, startLesson, type LessonState } from "./lesson.ts";
 import { LESSONS, type StepView } from "./lessons.ts";
 
