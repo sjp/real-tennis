@@ -38,16 +38,26 @@ describe("planAssist", () => {
     let sim = lob;
     let plan = planAssist(NO_PLAN, world, sim);
     let afresh = 0;
+    let checks = 0;
+    let contact = false;
     for (let n = 1; n <= 240 * 6; n++) {
-      sim = step(world, sim).state;
+      const r = step(world, sim);
+      sim = r.state;
+      contact ||= r.events.length > 0;
       if (n % 4) continue;
       const next = planAssist(plan, world, sim);
       const p = next.prediction;
       if (p && !plan.prediction?.path.includes(p.path[0]!)) afresh++;
       plan = next;
+      // A fresh prediction is slow, so check against one now and then, and
+      // always just after a contact, where the plan is expected to change.
+      if (n % 24 && !contact) continue;
+      contact = false;
+      checks++;
       const want = sim.asleep ? null : fresh(sim);
       expect(plan.prediction ? rings(plan, sim) : null).toEqual(want);
     }
+    expect(checks).toBeGreaterThan(60);
     // Only as it meets the floor or a wall, not every frame.
     expect(afresh).toBeLessThan(20);
   });
