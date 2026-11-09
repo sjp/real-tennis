@@ -1,9 +1,27 @@
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
 // https://vite.dev/config/
 export default defineConfig(({ command, isPreview }) => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // A precaching service worker so the installed game launches and plays
+    // offline after one visit (215). It updates itself on the next load after
+    // a deploy. public/manifest.webmanifest stays the manifest.
+    VitePWA({
+      registerType: "autoUpdate",
+      strategies: "generateSW",
+      manifest: false,
+      workbox: {
+        // The built chunks plus the icons and manifest from public/.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+        // The three chunk is about 950 kB, under the 2 MiB default, but leave
+        // room for it to grow without silently dropping out of the precache.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
+    }),
+  ],
   // Served from https://sjp.github.io/real-tennis/; the dev server stays at /.
   base: command === "build" || isPreview ? "/real-tennis/" : "/",
   test: {
